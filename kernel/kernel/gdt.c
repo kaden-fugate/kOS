@@ -1,14 +1,23 @@
 #include "gdt.h"
 
-struct gdt_entry gdt[GDT_ENTRIES];                                             // actual GDT
+/* ------------------------------------------------------------------------- *\
+|                                                                             |
+| macro name:  gdt_entries                                                    |
+| description: our actual gdt will have 5 entries:                            |
+|   1. null, 2. kernel code, 3. kernel data, 4. user code, 5. user data       |
+|                                                                             |
+\* ------------------------------------------------------------------------- */
+#define GDT_ENTRIES 5
+
+struct gdt_entry gdt[GDT_ENTRIES];                                             // actual gdt
 struct gdt_ptr gdtp;                                                           // what we give to lgdt
 
 /* ------------------------------------------------------------------------- *\
 |                                                                             |
 | function name: gdt_set_entry                                                |
-| description:   populate the GDT entry using the parameters.                 |
+| description:   populate the gdt entry using the parameters.                 |
 | paramters:                                                                  |
-|   1. index:       GDT entry to populate                                     |
+|   1. index:       gdt entry to populate                                     |
 |   2. base:        base address          (see gdt_entry def for more info)   |
 |   3. limit:       segment limit         (see gdt_entry def for more info)   |
 |   4. access:      access bits           (see gdt_entry def for more info)   |
@@ -57,14 +66,14 @@ void gdt_init(void) {
 
     /* ------------------------------------------------------------------------- *\
     |                                                                             |
-    | GDT entry: null descriptor                                                  |
+    | gdt entry: null descriptor                                                  |
     |                                                                             |
     \* ------------------------------------------------------------------------- */
     gdt_set_entry(0, 0, 0, 0, 0);
 
     /* ------------------------------------------------------------------------- *\
     |                                                                             |
-    | GDT entry:      kernel code segment                                         |
+    | gdt entry:      kernel code segment                                         |
     | layout:                                                                     |
     |   base address: 0x0                                                         |
     |   segment lim:  0xFFFFF                              (entire address space) |
@@ -78,7 +87,7 @@ void gdt_init(void) {
 
     /* ------------------------------------------------------------------------- *\
     |                                                                             |
-    | GDT entry:      kernel data segment                                         |
+    | gdt entry:      kernel data segment                                         |
     | layout:                                                                     |
     |   base address: 0x0                                                         |
     |   segment lim:  0xFFFFF                              (entire address space) |
@@ -92,7 +101,7 @@ void gdt_init(void) {
 
     /* ------------------------------------------------------------------------- *\
     |                                                                             |
-    | GDT entry:      user code segment                                           |
+    | gdt entry:      user code segment                                           |
     | layout:                                                                     |
     |   base address: 0x0                                                         |
     |   segment lim:  0xFFFFF                              (entire address space) |
@@ -107,7 +116,7 @@ void gdt_init(void) {
     // Entry 4: user data segment (ring 3). Same idea: 0x92 | 0x60 = 0xF2.
     /* ------------------------------------------------------------------------- *\
     |                                                                             |
-    | GDT entry:      user code segment                                           |
+    | gdt entry:      user code segment                                           |
     | layout:                                                                     |
     |   base address: 0x0                                                         |
     |   segment lim:  0xFFFFF                              (entire address space) |
@@ -123,10 +132,10 @@ void gdt_init(void) {
     gdtp.limit = sizeof(gdt) - 1;
     gdtp.base  = (uint64_t)&gdt;
 
-    // load new GDT into CPUs GDTR register. still need to update our CS/DS/etc
+    // load new gdt into CPUs GDTR register. still need to update our CS/DS/etc
     // though.
     asm volatile("lgdt %0" : : "m"(gdtp));
 
-    // reload segments now that we have GDT initialized and loaded
+    // reload segments now that we have gdt initialized and loaded
     gdt_reload_segments();
 }

@@ -5,7 +5,7 @@
 
 /* ------------------------------------------------------------------------- *\
 |                                                                             |
-| function name: gdt_int                                                      |
+| function name: gdt_init                                                     |
 | description:   init and load GTD (replace what GRUB set up... it put us in  |
 |                32 bit). we should call this first before anything relies on |
 |                our segment selectors.                                       |
@@ -49,17 +49,8 @@ struct gdt_entry {
 |                                                                             |
 \* ------------------------------------------------------------------------- */
 struct gdt_ptr {
-    uint16_t limit;  // size of the GDT in bytes, minus 1 (CPU convention)
-    uint64_t base;   // linear address of the first entry in the GDT
+    uint16_t limit; 
+    uint64_t base;
 } __attribute__((packed));
-
-/* ------------------------------------------------------------------------- *\
-|                                                                             |
-| macro name:  gdt_entries                                                    |
-| description: our actual GDT will have 5 entries:                            |
-|   1. null, 2. kernel code, 3. kernel data, 4. user code, 5. user data       |
-|                                                                             |
-\* ------------------------------------------------------------------------- */
-#define GDT_ENTRIES 5
 
 #endif
