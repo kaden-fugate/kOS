@@ -21,12 +21,19 @@ p2_table:
 stack_bottom:
     resb 16384
 stack_top:
+align 4
+magic: resd 1
+info_ptr: resd 1
 
 section .text
 bits 32
 global _start
 _start:
     mov esp, stack_top
+
+    ; save eax and ebx
+    mov [magic], eax
+    mov [info_ptr], ebx
 
     call set_up_page_tables
     call enable_paging
@@ -94,5 +101,7 @@ long_mode_start:
     mov fs, ax
     mov gs, ax
 
+    mov edi, [info_ptr]
+    mov esi, [magic]
     call kernel_main
     hlt
