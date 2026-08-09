@@ -134,7 +134,7 @@ void idt_common_handler(struct interrupt_frame *frame) {
         uint64_t fault_addr;
         asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
 
-        serial_print("PAGE FAULT\n");
+        serial_print("PAGE FAULT");
     } else {
         serial_print("EXCEPTION: ");
         serial_print(exception_names[frame->vector]);

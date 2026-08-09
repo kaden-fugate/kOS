@@ -10,8 +10,6 @@ static inline uint8_t inb(uint16_t port) {
     return ret;
 }
 
-#define COM1 0x3F8
-
 void serial_init(void) {
     outb(COM1 + 1, 0x00); // disable interrupts
     outb(COM1 + 3, 0x80); // enable DLAB
@@ -33,4 +31,81 @@ void serial_putc(char c) {
 
 void serial_print(const char *s) {
     for (int i = 0; s[i]; i++) serial_putc(s[i]);
+}
+
+void serial_print_uint(uint64_t val, int base) {
+    if (!val) {
+        serial_putc('0');
+        return;
+    }
+
+    char       buf[16] = "";
+    const char chars[] = "0123456789ABCDEF";
+    int i        = 0;
+
+    while (val > 0) {
+        buf[i++] = chars[val % base];
+        val     /= base;
+    }
+
+    while (i > 0) serial_putc(buf[--i]);
+}
+
+void serial_print_int(int64_t val) {
+    if (val < 0) {
+        serial_putc('-');
+        val = -val;
+    }
+
+    serial_print_uint(val, 10);
+}
+
+void serial_printf(const char *frmt, void *argv[]) {
+    // while we havent reached a null terminator
+    //  iterate through the format
+    //  if we see %, look at the next character:
+    //      if d, 32bit:   int
+    //      if u, 32bit:   unsigned int
+    //      if x, 32bit:   hex
+    //      if l, 64bit:   int/u_int/hex
+    //      if s, string:  (we have serial_print)
+    //      if c, char:    (serial putc)
+    //      anything else: just print the character
+
+    int cur_arg = 0;
+    int64_t  *i_val;
+    uint64_t *u_val;
+    char     *c_val;
+    for (int i = 0; frmt[i]; ++i) {
+        if (frmt[i] != '%') { 
+            serial_putc(frmt[i]); 
+            continue;
+        }
+        ++i;
+        
+        // we found a %
+        switch (frmt[i]) {
+            case 'd':
+                i_val = (int64_t *)argv[cur_arg++];
+                serial_print_int(*i_val);
+                break;
+            case 'u':
+                u_val = (uint64_t *)argv[cur_arg++];
+                serial_print_uint(*u_val, 10);
+                break;
+            case 'x':
+                serial_print("0x");
+                u_val = (uint64_t *)argv[cur_arg++];
+                serial_print_uint(*u_val, 16);
+                break;
+            case 's':
+                c_val = (char *)argv[cur_arg++];
+                serial_print(c_val);
+                break;
+            default:
+                serial_putc('%');
+                serial_putc(frmt[i]);
+                continue;
+        }
+    }
 }
