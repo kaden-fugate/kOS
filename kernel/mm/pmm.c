@@ -12,6 +12,38 @@ void buddy_alloc(uint64_t start, uint8_t order) {
     order_bm[order][block_idx / 8] &= ~(1ULL << (block_idx % 8));              // (block_idx / 8): blocks byte in bm, (block_idx % 8): blocks bit in bm's byte
 }
 
+void check_sum(uint64_t reported_free, uint64_t rnd_loss) {
+    uint64_t free_bytes = 0;
+    uint64_t ord_byte   = 0;
+    uint64_t cnt        = 0;
+
+    struct free_block *cur = 0x0;
+
+    for (uint64_t ord = 0; ord <= MAX_ORDER; ++ord) {
+        ord_byte = 0;
+        cnt      = 0;
+        cur      = free_list[ord];
+
+        while (cur) {
+            ++cnt;
+            cur = cur->next;
+        }
+
+        ord_byte = cnt * (1ULL << ord) * PAGE_SIZE;
+        free_bytes += ord_byte;
+        {
+            void *args[] = {&ord, &cnt, &ord_byte};
+            serial_printf("[check_sum] ord: %u: %u blocks (%u bytes)\n", args);
+        }
+    }
+
+    {
+        uint64_t plus_rnd_loss = free_bytes + rnd_loss;
+        void *args[] = {&free_bytes, &plus_rnd_loss, &reported_free};
+        serial_printf("[check_sum] counted free: %u (with rounding loss: %u)\n[check_sum] reported free: %u\n\n", args);
+    }
+}
+
 void seed_region(uint64_t start, uint64_t end) {
     uint64_t order;
     uint64_t block_sz;
@@ -72,6 +104,9 @@ void pmm_init(uint32_t info_addr) {
 
     struct mb_tag *mmap_tag = 0x0;
     uint64_t       mmap_end = 0x0;
+
+    uint64_t      free_bytes = 0x0;
+    uint64_t      rnd_loss   = 0x0;
 
     {
         void *args[] = {&mb_ptr, &tag_ptr};
@@ -192,6 +227,13 @@ void pmm_init(uint32_t info_addr) {
             uint64_t frame_start = (rgn_start + PAGE_SIZE - 1) / PAGE_SIZE;
             uint64_t frame_end   = rgn_end / PAGE_SIZE;
 
+            if (!frame_start) ++frame_start;
+
+            uint64_t diff        = ((rgn_end - rgn_start) - (frame_end - frame_start) * PAGE_SIZE);
+            
+            rnd_loss   += diff;
+            free_bytes += (rgn_end - rgn_start);
+
             {
                 void *args[] = {&frame_start, &frame_end};
                 serial_printf("\tfrm_st:\t %x\n\tfrm_end: %x\n", args);
@@ -202,5 +244,7 @@ void pmm_init(uint32_t info_addr) {
         }
         ent_ptr += ent_sz;
     }
+
+    check_sum(free_bytes, rnd_loss);
 
 }
