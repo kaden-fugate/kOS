@@ -81,7 +81,7 @@ void seed_region(uint64_t start, uint64_t end) {
 |                0x0.                                                         |
 |                                                                             |
 \* ------------------------------------------------------------------------- */
-void check_sum(uint64_t reported_free, uint64_t rnd_loss) {
+void check_sum(uint64_t reported_free) {
     uint64_t free_bytes = 0;
     uint64_t ord_byte   = 0;
     uint64_t cnt        = 0;
@@ -107,11 +107,10 @@ void check_sum(uint64_t reported_free, uint64_t rnd_loss) {
     }
 
     {
-        uint64_t plus_rnd_loss = free_bytes + rnd_loss;
-        uint64_t diff_w_rnd    = reported_free - plus_rnd_loss;
-        void *args[] = {&free_bytes, &plus_rnd_loss, &reported_free, &diff_w_rnd};
+        uint64_t diff = reported_free - free_bytes;
+        void *args[] = {&free_bytes, &reported_free, &diff};
         serial_printf(
-            "[check_sum] counted free: %u (with rounding loss: %u)\n[check_sum] reported free: %u\n\n[check_sum] diff excl. rounding loss: %u\n\n", 
+            "\n[check_sum] counted free: %u\n[check_sum] reported free: %u\n[check_sum] diff: %u\n\n", 
             args
         );
     }
@@ -287,13 +286,21 @@ void pmm_init(uint32_t info_addr) {
 
     /* --------------------------- SECTION 3.0 BEGIN ----------------------------*/
     uint64_t      free_bytes = 0x0;
-    uint64_t      rnd_loss   = 0x0;
-    uint64_t      diff       = 0x0;
+
+    uint64_t reserved_start = (uint64_t) 0x100000 / PAGE_SIZE;
+    uint64_t reserved_end   = ((uint64_t) dat_end + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    {
+        uint64_t reserve_sz = reserved_end * PAGE_SIZE - reserved_start * PAGE_SIZE;
+        void *args[] = {&reserve_sz};
+        serial_printf("[pmm_init]:\tkernel reserve size: %u\n", args);
+    }
 
     ent_ptr = ent_start;                                                       // [SECTION 3.0 -> 1]
     while (ent_ptr < ent_end) {                                                // [SECTION 3.0 -> 2] each entry...
         struct mmap_entry *ent = (struct mmap_entry *) ent_ptr;                 
         if (ent->type == 1) {                                                  // [SECTION 3.0 -> 3.a] usable RAM
+            
             uint64_t rgn_start = ent->base_addr;
             uint64_t rgn_end   = ent->base_addr + ent->len;
 
@@ -301,21 +308,70 @@ void pmm_init(uint32_t info_addr) {
             uint64_t frame_end   = rgn_end / PAGE_SIZE;
 
             if (!frame_start) ++frame_start;                                   // [SECTION 3.0 -> 3.a.ii] if that first page is at 0x0, we skip it
+            
+            uint64_t left_end = frame_end < reserved_start 
+                                ? frame_end : reserved_start;
+            if (frame_start < left_end) {
+                seed_region(frame_start, left_end);
+                // free_bytes += (left_end - frame_start) * PAGE_SIZE;
+                //diff        = (left_end - frame_start) * PAGE_SIZE;
+            }
 
-            diff = (                                                           // [SECTION 3.0 -> 3.a.iii] keep track of rounding loss in bytes, count total bytes
-                (rgn_end - rgn_start) - (frame_end - frame_start) * PAGE_SIZE
-            );
-            rnd_loss   += diff;
-            free_bytes += (rgn_end - rgn_start);
-
-            if (frame_start < frame_end)                                       // [SECTION 3.0 -> 3.a.iv] actually seed the region
-                seed_region(frame_start, frame_end);
+            uint64_t right_start = frame_start > reserved_end 
+                                   ? frame_start : reserved_end;
+            if (right_start < frame_end){
+                seed_region(right_start, frame_end);
+                // free_bytes += (frame_end - right_start) * PAGE_SIZE;
+                //diff       += (frame_end - right_start) * PAGE_SIZE;
+            }
+            
+            free_bytes += rgn_end - rgn_start;
         }
         ent_ptr += ent_sz;
     }
 
-    check_sum(free_bytes, rnd_loss);                                           // [SECTION 3.0 -> 4] check that the pmm is allocating bytes as expected
-
+    check_sum(free_bytes);                                                     // [SECTION 3.0 -> 4] check that the pmm is allocating bytes as expected
     /* ---------------------------- SECTION 3.0 END -----------------------------*/
 
+}
+
+uint64_t pmm_alloc(uint64_t order) {
+
+    uint64_t found_order = order;
+    while (found_order <= MAX_ORDER && free_list[found_order] == 0x0) 
+        ++found_order;
+
+    if (found_order > MAX_ORDER) {
+        serial_print("[pmm_alloc]:\tFATAL ERROR. NO MEMORY.\n");
+        return 0x0;
+    }
+
+    // remove from free_list
+    struct free_block *addr = free_list[found_order];
+    free_list[found_order] = addr->next;
+
+    // {
+    //     uint64_t add = (uint64_t) addr;
+    //     void *args[] = {&found_order, &add};
+    //     serial_printf("[pmm_alloc]:\tFOUND AT ORDER %u (%x)\n", args);
+    // }
+
+    // mark bit as occupied
+    uint64_t block_idx = ((uint64_t) addr / PAGE_SIZE) >> found_order;
+    order_bm[found_order][block_idx / 8] |= (uint8_t)(1ULL << (block_idx % 8));
+
+    // allocate new blocks for each order >= order
+    while (found_order > order) {
+        --found_order;
+
+        // set buddy to free
+        uint64_t buddy = ((uint64_t) addr / PAGE_SIZE) + (1ULL << found_order);
+        buddy_alloc(buddy, found_order);
+
+        // mark block to alloc from as used
+        block_idx = ((uint64_t) addr / PAGE_SIZE) >> found_order;
+        order_bm[found_order][block_idx / 8] |= (1ULL << (block_idx % 8));
+    }
+
+    return (uint64_t) addr;
 }
