@@ -21,8 +21,14 @@ static uint64_t total_blocks;
 \* ------------------------------------------------------------------------- */
 void buddy_alloc(uint64_t start, uint8_t order) {
     struct free_block *free = (struct free_block *) (start * PAGE_SIZE);
+    
+    // new node will be head, next is cur head, prev is null
     free->next = free_list[order];
-    free_list[order] = free;
+    free->prev = 0x0;
+
+    // old head, prev is new head, overwrite with new head
+    if (free_list[order]) free_list[order]->prev = free;
+    free_list[order]       = free;
 
     uint64_t block_idx = start >> order;
     order_bm[order][block_idx / 8] &= ~(1ULL << (block_idx % 8));
@@ -86,7 +92,7 @@ void check_sum(uint64_t reported_free) {
     uint64_t ord_byte   = 0;
     uint64_t cnt        = 0;
 
-    struct free_block *cur = 0x0;
+    struct free_block *cur  = 0x0;
 
     for (uint64_t ord = 0; ord <= MAX_ORDER; ++ord) {
         ord_byte = 0;
@@ -311,19 +317,13 @@ void pmm_init(uint32_t info_addr) {
             
             uint64_t left_end = frame_end < reserved_start 
                                 ? frame_end : reserved_start;
-            if (frame_start < left_end) {
+            if (frame_start < left_end) 
                 seed_region(frame_start, left_end);
-                // free_bytes += (left_end - frame_start) * PAGE_SIZE;
-                //diff        = (left_end - frame_start) * PAGE_SIZE;
-            }
-
+            
             uint64_t right_start = frame_start > reserved_end 
                                    ? frame_start : reserved_end;
-            if (right_start < frame_end){
+            if (right_start < frame_end)
                 seed_region(right_start, frame_end);
-                // free_bytes += (frame_end - right_start) * PAGE_SIZE;
-                //diff       += (frame_end - right_start) * PAGE_SIZE;
-            }
             
             free_bytes += rgn_end - rgn_start;
         }
@@ -337,6 +337,8 @@ void pmm_init(uint32_t info_addr) {
 
 uint64_t pmm_alloc(uint64_t order) {
 
+    if (order > MAX_ORDER) return 0x0;
+
     uint64_t found_order = order;
     while (found_order <= MAX_ORDER && free_list[found_order] == 0x0) 
         ++found_order;
@@ -347,14 +349,9 @@ uint64_t pmm_alloc(uint64_t order) {
     }
 
     // remove from free_list
-    struct free_block *addr = free_list[found_order];
-    free_list[found_order] = addr->next;
-
-    // {
-    //     uint64_t add = (uint64_t) addr;
-    //     void *args[] = {&found_order, &add};
-    //     serial_printf("[pmm_alloc]:\tFOUND AT ORDER %u (%x)\n", args);
-    // }
+    struct free_block *addr      = free_list[found_order];
+    free_list[found_order]       = addr->next;
+    if (free_list[found_order]) free_list[found_order]->prev = 0x0;
 
     // mark bit as occupied
     uint64_t block_idx = ((uint64_t) addr / PAGE_SIZE) >> found_order;
@@ -374,4 +371,48 @@ uint64_t pmm_alloc(uint64_t order) {
     }
 
     return (uint64_t) addr;
+}
+
+void pmm_free(uint64_t addr, uint64_t order) {
+    if (order > MAX_ORDER || (addr % (PAGE_SIZE << order)) != 0) return;
+
+    struct free_block *node = 0x0;
+
+    uint64_t page = addr / PAGE_SIZE;
+    uint64_t buddy_page;
+    uint64_t block_idx;
+    uint64_t buddy;
+    uint8_t  mask;
+    uint8_t  cur_mask = (uint8_t) (1ULL << (block_idx % 8));
+
+    if (order_bm[order][block_idx / 8] & cur_mask == 0x0) return;              // no double frees
+
+    // check if buddy at cur order is also free
+    while (order < MAX_ORDER) {
+
+        // locate the returned block in the order_bitmap
+        block_idx = page >> order;
+        buddy     = block_idx ^ 1;
+
+        if (buddy >= order_blk_cnt[order]) break;
+
+        mask = (uint8_t) (1ULL << (buddy % 8));
+        if (order_bm[order][buddy / 8] & mask) break;                          // dont coalesce if buddy isnt free
+
+        buddy_page = buddy << order;
+        node = (struct free_block *) (buddy_page * PAGE_SIZE);
+
+        if (node->prev) node->prev->next = node->next;                         // case not the head
+        else            free_list[order] = node->next;                         // case node is the head
+            
+        if (node->next) node->next->prev = node->prev;                         // case node is not the tail
+
+        order_bm[order][buddy / 8] |= mask;                                    // set buddy to reserved
+
+        if (buddy_page < page) page = buddy_page;                              // if buddy is <, set buddy as start frame to seed
+        ++order;
+    }
+
+    // seed region
+    buddy_alloc(page, order);
 }
