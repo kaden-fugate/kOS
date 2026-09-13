@@ -126,7 +126,7 @@ static const char *exception_names[32] = {
 
 
 void idt_common_handler(struct interrupt_frame *frame) {
-
+    
     // 14: page fault
     if (frame->vector == 14) {
         // faulting addr is not on stack with a page fault, put it in cr2
@@ -134,7 +134,7 @@ void idt_common_handler(struct interrupt_frame *frame) {
         uint64_t fault_addr;
         asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
 
-        serial_print("PAGE FAULT");
+        serial_print("PAGE FAULT\n");
     } else {
         serial_print("EXCEPTION: ");
         serial_print(exception_names[frame->vector]);

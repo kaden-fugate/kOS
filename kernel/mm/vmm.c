@@ -122,6 +122,7 @@ void vmm_test() {
         (void*[]){&phys, &virt, &trns, &phys}
     );
 
+    // test mapping worked
     uint64_t *test_ptr = (uint64_t *)virt;
     *test_ptr = 0xCAFEBABE;
     serial_print("[vmm_test] no crash on write to virtual address? :^)\n");
@@ -131,4 +132,22 @@ void vmm_test() {
         "[vmm_test] read physical mem = %x (expected: 0xCAFEBABE)\n",
         (void*[]){phys_ptr}
     );
+
+    // test unmap virt mem
+    vmm_unmap(k_pml4, virt);
+    trns = vmm_translate(virt);
+    
+    serial_printf(
+        "[vmm_test] transated = %x (expected: 0x0)\n", 
+        (void*[]){&trns}
+    );
+
+    // test permissions
+    uint64_t r_phys = pmm_alloc(0);
+    uint64_t r_virt = 0xCAFEBABE;
+    vmm_map(k_pml4, r_virt, r_phys, 0);
+
+    serial_print("[vmm_test] write to read-only memory\n");
+    *(uint64_t *)r_virt = 0xCAFEBABE;
+    serial_print("[vmm_test] if we reached this point, permissions enforcement failed.\n");
 }
