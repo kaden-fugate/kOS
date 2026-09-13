@@ -6,10 +6,10 @@ LDFLAGS = -n -T linker.ld
 
 OVMF = /opt/homebrew/Cellar/qemu/11.0.3/share/qemu/edk2-x86_64-code.fd
 
-SRC_C = $(wildcard kernel/*.c drivers/*.c mm/*.c)
+SRC_C = $(wildcard kernel/*.c drivers/*.c mm/*.c kutil/*.c)
 OBJ_C = $(patsubst %.c, out/%.o, $(notdir $(SRC_C)))
 
-VPATH = kernel:drivers:mm
+VPATH = kernel:drivers:mm:kutil
 
 .PHONY: all boot kernel grub no-qemu qemu clean
 

@@ -199,12 +199,12 @@ void pmm_init(uint32_t info_addr) {
     uint8_t *ent_start =  (uint8_t  *) mmap_tag + 16;                          // [SECTION 2.0 -> 1] first entry in mmap
     uint8_t *ent_end   =  (uint8_t  *) mmap_tag + mmap_tag->size;              
     uint32_t ent_sz    = *(uint32_t *) ((uint8_t *)mmap_tag + 8);              // [SECTION 2.0 -> 2] size of an entry
-    uint64_t       mmap_end = 0x0;
+    uint64_t mmap_end  =  0x0;
 
     uint8_t *ent_ptr = ent_start;
     while (ent_ptr < ent_end) {
         struct mmap_entry *ent = (struct mmap_entry *) ent_ptr;
-        if (ent->type == 1) {                                                  // [SECTION 2.0 -> 3.a] entry is marked as usable RAM
+        if (ent->type == 1) {                                                  // [SECTION 2.0 -> 3.b]
             uint64_t rgn_end = ent->base_addr + ent->len;
             if (rgn_end > mmap_end) mmap_end = rgn_end;
         }
@@ -415,4 +415,25 @@ void pmm_free(uint64_t addr, uint64_t order) {
 
     // seed region
     buddy_alloc(page, order);
+}
+
+void pmm_test() {
+    uint64_t total_alloc  = 0x0;
+    uint64_t phys_list    = pmm_alloc(9);
+    uint64_t *p_free_list = (uint64_t *)phys_list;
+    uint64_t i = 0;
+    
+    for (; (p_free_list[i] = pmm_alloc(0)) != 0x0; i++) {
+        total_alloc += PAGE_SIZE;
+    }
+
+    serial_printf("[kernel_main] ALL MEM ALLOC'D: %u\n", (void*[]){&total_alloc});
+
+    uint64_t j = 0;
+    for (; j < i; j++) {
+        pmm_free(p_free_list[j], 0);
+    }
+    pmm_free(phys_list, 9);
+
+    serial_printf("[kernel_main] ALL MEM FREED.\n", 0x0);
 }

@@ -1,9 +1,12 @@
 #include <stdint.h>
+
 #include "drivers/serial.h"
+
 #include "kernel/gdt.h"
 #include "kernel/idt.h"
 
 #include "mm/pmm.h"
+#include "mm/vmm.h"
 
 void kernel_main(uint32_t info_ptr, uint32_t magic) {
     serial_init();
@@ -17,18 +20,10 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
     // serial_print("If you see this, IDT didn't work! :(\n");
 
     pmm_init(info_ptr);
+    pmm_test();
 
-    uint64_t total_alloc = 0x0;
-    uint64_t free        = pmm_alloc(0);
-    while (free != 0x0) {
-        total_alloc += PAGE_SIZE;
-        free         = pmm_alloc(0);
-    }
-
-    {
-        void *args[] = {&total_alloc};
-        serial_printf("ALL MEM ALLOC'D: %u\n", args);
-    }
+    vmm_init();
+    vmm_test();
 
     for (;;) {
         asm volatile("hlt");
