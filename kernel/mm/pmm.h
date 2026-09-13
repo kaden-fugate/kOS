@@ -33,6 +33,24 @@ void pmm_init(uint32_t);
 
 /* ------------------------------------------------------------------------- *\
 |                                                                             |
+| function name: pmm_alloc                                                    |
+| description:   this function is only to be used AFTER pmm_init.             |
+|                will find an available block of a given order. if we only    |
+|                have blocks at order > requested order, then we can split    |
+|                down these larger blocks.                                    |
+|                                                                             |
+|                to split a block, find the blocks of the next order. mark    |
+|                right block (buddy) to available. repeat until we reach the  |
+|                correct order (do NOT free the orders buddy).                |
+|                                                                             |
+\* ------------------------------------------------------------------------- */
+uint64_t pmm_alloc(uint64_t);
+
+void pmm_free(uint64_t, uint64_t);
+void pmm_test();
+
+/* ------------------------------------------------------------------------- *\
+|                                                                             |
 | struct name: mb_tag                                                         |
 | description: mirrors the exact layout for a multiboot2 tag. these tags will |
 |              tell us the type of multiboot flag we're looking at (0 =       |
@@ -80,6 +98,7 @@ struct mmap_entry {
 \* ------------------------------------------------------------------------- */
 struct free_block {
     struct free_block *next;
+    struct free_block *prev;
 };
 
 /* ------------------------------------------------------------------------- *\
