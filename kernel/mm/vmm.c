@@ -93,6 +93,20 @@ void vmm_unmap(uint64_t *pml4, uint64_t virt) {
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 
+uint64_t vmm_alloc(
+    uint64_t *pml4, uint64_t virt, uint8_t order, uint64_t flags
+) {
+    uint64_t phys = pmm_alloc(order);
+    if (!phys) return 0x0;
+
+    uint64_t n_pages = 1ULL << order;
+    for (int i = 0; i < n_pages; i++) {
+        vmm_map(pml4, virt + (i * PAGE_SIZE), phys + (i * PAGE_SIZE), flags);
+    }
+
+    return virt;
+}
+
 void vmm_test() {
     
     // test vmm_translate
