@@ -21,10 +21,11 @@
 
 #endif
 
-void vmm_init();
-void vmm_map(uint64_t*, uint64_t, uint64_t, uint64_t);
-void vmm_unmap(uint64_t*, uint64_t);
-void vmm_test();
+void     vmm_init();
+void     vmm_map(uint64_t*, uint64_t, uint64_t, uint64_t);
+void     vmm_unmap(uint64_t*, uint64_t);
+uint64_t vmm_alloc(uint64_t*, uint64_t, uint8_t, uint64_t);
+void     vmm_test();
 
 /*
 63  62..........................52  51.......................12  11....9 8  7  6  5  4  3  2  1  0
