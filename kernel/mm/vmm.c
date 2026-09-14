@@ -3,7 +3,7 @@
 #include "drivers/serial.h"
 #include "kutil/string.h"
 
-static uint64_t *k_pml4;
+uint64_t *k_pml4 = null;
 
 void vmm_init() {
     uint64_t cr3;
@@ -41,17 +41,17 @@ void vmm_map(uint64_t *pml4, uint64_t virt, uint64_t phys, uint64_t flags) {
 }
 
 uint64_t vmm_translate(uint64_t virt) {
-    uint64_t *pdpt = 0x0;
-    uint64_t *pd   = 0x0;
-    uint64_t *pt   = 0x0;
+    uint64_t *pdpt = null;
+    uint64_t *pd   = null;
+    uint64_t *pt   = null;
     uint64_t  base = 0x0;
 
-    // get pml4e (0x0 if not present)
+    // get pml4e (null if not present)
     uint64_t pml4e = k_pml4[PML4_IDX(virt)];
     if (!(pml4e & PTE_PRESENT)) return 0x0;
     pdpt = PHYS_TO_VIRT(pml4e & PTE_ADDR_MASK);
 
-    // get pdpte (0x0 if not present, huge page if PS flag set)
+    // get pdpte (null if not present, huge page if PS flag set)
     uint64_t pdpte = pdpt[PDPT_IDX(virt)];
     if (!(pdpte & PTE_PRESENT)) return 0x0;
     if (pdpte & PTE_PS) { 
@@ -71,7 +71,7 @@ uint64_t vmm_translate(uint64_t virt) {
     }
     pt = PHYS_TO_VIRT(pde & PTE_ADDR_MASK);
 
-    // get pte (0x0 if not present)
+    // get pte (null if not present)
     uint64_t pte = pt[PT_IDX(virt)];
     if (!(pte & PTE_PRESENT)) return 0x0;
 
@@ -118,7 +118,7 @@ void vmm_test() {
 
     result = vmm_translate(0xFFFF800000000000);
     serial_printf(
-        "[vmm_test] translate(0xFFFF800000000000) = %x (expected: 0x0)\n",
+        "[vmm_test] translate(0xFFFF800000000000) = %x (expected: null)\n",
         (void*[]){&result}
     );
 
@@ -152,7 +152,7 @@ void vmm_test() {
     trns = vmm_translate(virt);
     
     serial_printf(
-        "[vmm_test] transated = %x (expected: 0x0)\n", 
+        "[vmm_test] transated = %x (expected: null)\n", 
         (void*[]){&trns}
     );
 

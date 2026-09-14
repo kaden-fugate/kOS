@@ -1,10 +1,7 @@
 #ifndef PMM_H
 #define PMM_H
 
-#include <stdint.h>
-
-#define PAGE_SIZE 4096
-#define MAX_ORDER 10
+#include "mm/def.h"
 
 /* ------------------------------------------------------------------------- *\
 |                                                                             |
