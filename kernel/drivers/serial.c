@@ -61,7 +61,7 @@ void serial_print_int(int64_t val) {
 }
 
 void serial_printf(const char *frmt, void *argv[]) {
-    // while we havent reached a null terminator
+    // while we havent reached a NULL terminator
     //  iterate through the format
     //  if we see %, look at the next character:
     //      if d, 32bit:   int

@@ -9,6 +9,5 @@
 #define PHYS_TO_VIRT(phys) ((uint64_t *)(uint64_t)(phys))
 
 #define NULL ((void*)0x0)
-#define null NULL
 
 #endif

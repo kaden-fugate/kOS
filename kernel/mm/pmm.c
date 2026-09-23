@@ -22,9 +22,9 @@ static uint64_t total_blocks;
 void buddy_alloc(uint64_t start, uint8_t order) {
     struct free_block *free = (struct free_block *) (start * PAGE_SIZE);
     
-    // new node will be head, next is cur head, prev is null
+    // new node will be head, next is cur head, prev is NULL
     free->next = free_list[order];
-    free->prev = null;
+    free->prev = NULL;
 
     // old head, prev is new head, overwrite with new head
     if (free_list[order]) free_list[order]->prev = free;
@@ -84,7 +84,7 @@ void seed_region(uint64_t start, uint64_t end) {
 |                ALSO, we want to compare the counted free + rounding loss to |
 |                do an accurate check. we expect 4KiB lost due to the fact    |
 |                that we skip the block starting at physical memory address   |
-|                null.                                                         |
+|                NULL.                                                         |
 |                                                                             |
 \* ------------------------------------------------------------------------- */
 void check_sum(uint64_t reported_free) {
@@ -92,7 +92,7 @@ void check_sum(uint64_t reported_free) {
     uint64_t ord_byte   = 0;
     uint64_t cnt        = 0;
 
-    struct free_block *cur  = null;
+    struct free_block *cur  = NULL;
 
     for (uint64_t ord = 0; ord <= MAX_ORDER; ++ord) {
         ord_byte = 0;
@@ -150,7 +150,7 @@ void pmm_init(uint32_t info_addr) {
     uint8_t *tag_ptr = mb_ptr + 8;                                             // [SECTION 1.0 -> 1] skip past size + magic
     uint32_t mb_size  = *(uint32_t *) mb_ptr;                                  // [SECTION 1.0 -> 2] multiboot header defines size of tag region
 
-    struct mb_tag *mmap_tag = null;
+    struct mb_tag *mmap_tag = NULL;
     
     while (tag_ptr < mb_ptr + mb_size) {                                       // [SECTION 1.0 -> 3] iterate over each tag
         struct mb_tag *tag = (struct mb_tag *) tag_ptr;
@@ -199,7 +199,7 @@ void pmm_init(uint32_t info_addr) {
     uint8_t *ent_start =  (uint8_t  *) mmap_tag + 16;                          // [SECTION 2.0 -> 1] first entry in mmap
     uint8_t *ent_end   =  (uint8_t  *) mmap_tag + mmap_tag->size;              
     uint32_t ent_sz    = *(uint32_t *) ((uint8_t *)mmap_tag + 8);              // [SECTION 2.0 -> 2] size of an entry
-    uint64_t mmap_end  =  null;
+    uint64_t mmap_end  =  0x0;
 
     uint8_t *ent_ptr = ent_start;
     while (ent_ptr < ent_end) {
@@ -217,7 +217,7 @@ void pmm_init(uint32_t info_addr) {
     | section ID:    SECTION 2.1                                                  |
     | description:   now that we have the highest address of physical memory, we  |
     |                can initialize free_list and order_bm. free_list for each    |
-    |                order should be set to null, the order_bm for each order     |
+    |                order should be set to NULL, the order_bm for each order     |
     |                needs to know how many blocks of order n can be fit into the |
     |                given bitmap. each bit in the map corresponds to a single    |
     |                block of order n.                                            |
@@ -233,7 +233,7 @@ void pmm_init(uint32_t info_addr) {
     |                  b. allocate the number of bytes worth of blocks to order_bm|
     |                     (8 blocks per byte, round to num bytes needed)          |
     |                  c. mark the bytes of the bit map as fully reserved for now.|
-    |                  d. set the head of the free list at this order to null.    |
+    |                  d. set the head of the free list at this order to NULL.    |
     |            4. mark the end of where we stored order_bm.                     |
     |                                                                             |
     \* ------------------------------------------------------------------------- */
@@ -253,7 +253,7 @@ void pmm_init(uint32_t info_addr) {
         for (uint64_t byte = 0; byte < num_b; ++byte)
             order_bm[ord][byte] = (uint8_t) 0xFF;                              // [SECTION 2.1 -> 3.c] set all blocks as reserved
     
-        free_list[ord] = null;                                                  // [SECTION 2.1 -> 3.d] free_list for order points to null
+        free_list[ord] = NULL;                                                  // [SECTION 2.1 -> 3.d] free_list for order points to NULL
 
     }
 
@@ -276,8 +276,8 @@ void pmm_init(uint32_t info_addr) {
     |                   i.   get the beginning and end of the available memory    |
     |                        in units = # of pages in mem.                        |
     |                   ii.  IF we find that the block starts at physical memory  |
-    |                        address 0, we need to increment it by 1 page (null    |
-    |                        null. it's going to make things confusing).          |
+    |                        address 0, we need to increment it by 1 page (NULL    |
+    |                        NULL. it's going to make things confusing).          |
     |                   iii. keep track of the rounding loss and the amount of    |
     |                        free bytes we've counted for the check sum later on. |
     |                   iv.  seed the region of pages, will find the most         |
@@ -291,7 +291,7 @@ void pmm_init(uint32_t info_addr) {
     \* ------------------------------------------------------------------------- */
 
     /* --------------------------- SECTION 3.0 BEGIN ----------------------------*/
-    uint64_t      free_bytes = null;
+    uint64_t      free_bytes = 0x0;
 
     uint64_t reserved_start = (uint64_t) 0x100000 / PAGE_SIZE;
     uint64_t reserved_end   = ((uint64_t) dat_end + PAGE_SIZE - 1) / PAGE_SIZE;
@@ -313,7 +313,7 @@ void pmm_init(uint32_t info_addr) {
             uint64_t frame_start = (rgn_start + PAGE_SIZE - 1) / PAGE_SIZE;    // [SECTION 3.0 -> 3.a.i] first page in memory region
             uint64_t frame_end   = rgn_end / PAGE_SIZE;
 
-            if (!frame_start) ++frame_start;                                   // [SECTION 3.0 -> 3.a.ii] if that first page is at null, we skip it
+            if (!frame_start) ++frame_start;                                   // [SECTION 3.0 -> 3.a.ii] if that first page is at NULL, we skip it
             
             uint64_t left_end = frame_end < reserved_start 
                                 ? frame_end : reserved_start;
@@ -337,21 +337,21 @@ void pmm_init(uint32_t info_addr) {
 
 uint64_t pmm_alloc(uint64_t order) {
 
-    if (order > MAX_ORDER) return null;
+    if (order > MAX_ORDER) return 0x0;
 
     uint64_t found_order = order;
-    while (found_order <= MAX_ORDER && free_list[found_order] == null) 
+    while (found_order <= MAX_ORDER && free_list[found_order] == NULL) 
         ++found_order;
 
     if (found_order > MAX_ORDER) {
         serial_print("[pmm_alloc]:\tFATAL ERROR. NO MEMORY.\n");
-        return null;
+        return 0x0;
     }
 
     // remove from free_list
     struct free_block *addr      = free_list[found_order];
     free_list[found_order]       = addr->next;
-    if (free_list[found_order]) free_list[found_order]->prev = null;
+    if (free_list[found_order]) free_list[found_order]->prev = NULL;
 
     // mark bit as occupied
     uint64_t block_idx = ((uint64_t) addr / PAGE_SIZE) >> found_order;
@@ -376,7 +376,7 @@ uint64_t pmm_alloc(uint64_t order) {
 void pmm_free(uint64_t addr, uint64_t order) {
     if (order > MAX_ORDER || (addr % (PAGE_SIZE << order)) != 0) return;
 
-    struct free_block *node = null;
+    struct free_block *node = NULL;
 
     uint64_t page = addr / PAGE_SIZE;
     uint64_t buddy_page;
@@ -385,7 +385,7 @@ void pmm_free(uint64_t addr, uint64_t order) {
     uint8_t  mask;
     uint8_t  cur_mask = (uint8_t) (1ULL << (block_idx % 8));
 
-    if (order_bm[order][block_idx / 8] & cur_mask == null) return;              // no double frees
+    if (order_bm[order][block_idx / 8] & cur_mask == 0x0) return;              // no double frees
 
     // check if buddy at cur order is also free
     while (order < MAX_ORDER) {
@@ -418,12 +418,12 @@ void pmm_free(uint64_t addr, uint64_t order) {
 }
 
 void pmm_test() {
-    uint64_t total_alloc  = null;
+    uint64_t total_alloc  = 0x0;
     uint64_t phys_list    = pmm_alloc(9);
     uint64_t *p_free_list = (uint64_t *)phys_list;
     uint64_t i = 0;
     
-    for (; (p_free_list[i] = pmm_alloc(0)) != null; i++) {
+    for (; (p_free_list[i] = pmm_alloc(0)) != 0x0; i++) {
         total_alloc += PAGE_SIZE;
     }
 
@@ -435,5 +435,5 @@ void pmm_test() {
     }
     pmm_free(phys_list, 9);
 
-    serial_printf("[kernel_main] ALL MEM FREED.\n", null);
+    serial_printf("[kernel_main] ALL MEM FREED.\n", NULL);
 }

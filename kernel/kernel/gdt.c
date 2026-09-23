@@ -4,7 +4,7 @@
 |                                                                             |
 | macro name:  gdt_entries                                                    |
 | description: our actual gdt will have 5 entries:                            |
-|   1. null, 2. kernel code, 3. kernel data, 4. user code, 5. user data       |
+|   1. NULL, 2. kernel code, 3. kernel data, 4. user code, 5. user data       |
 |                                                                             |
 \* ------------------------------------------------------------------------- */
 #define GDT_ENTRIES 5
@@ -66,7 +66,7 @@ void gdt_init(void) {
 
     /* ------------------------------------------------------------------------- *\
     |                                                                             |
-    | gdt entry: null descriptor                                                  |
+    | gdt entry: NULL descriptor                                                  |
     |                                                                             |
     \* ------------------------------------------------------------------------- */
     gdt_set_entry(0, 0, 0, 0, 0);

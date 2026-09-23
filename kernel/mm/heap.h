@@ -3,6 +3,8 @@
 
 #include "mm/def.h"
 
+#define MIN_SPLIT_SZ 16
+
 struct heap_block {
     uint64_t           size;
     uint8_t            free;
@@ -14,10 +16,13 @@ struct heap_block {
 static const uint64_t bin_sizes[NUM_BINS] = {
     16, 32, 64, 128, 256, 512, 1024, 0
 };
-static struct heap_block *bins[NUM_BINS] = { null };
+static struct heap_block *bins[NUM_BINS] = { NULL };
 
-#define HEAP_VIRT_BASE 0xDEADBEEF
+#define HEAP_VIRT_BASE 0xDEADB000ULL
 
-void heap_init();
+void  heap_init();
+void *kmalloc(uint64_t);
+void  kfree(void*);
+void  heap_test();
 
 #endif
