@@ -7,6 +7,7 @@
 
 #include "mm/pmm.h"
 #include "mm/vmm.h"
+#include "mm/heap.h"
 
 void kernel_main(uint32_t info_ptr, uint32_t magic) {
     serial_init();
@@ -24,6 +25,9 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
 
     vmm_init();
     vmm_test();
+
+    heap_init();
+    heap_test();
 
     for (;;) {
         asm volatile("hlt");

@@ -3,7 +3,7 @@
 #include "drivers/serial.h"
 #include "kutil/string.h"
 
-uint64_t *k_pml4 = null;
+uint64_t *k_pml4 = NULL;
 
 void vmm_init() {
     uint64_t cr3;
@@ -41,17 +41,17 @@ void vmm_map(uint64_t *pml4, uint64_t virt, uint64_t phys, uint64_t flags) {
 }
 
 uint64_t vmm_translate(uint64_t virt) {
-    uint64_t *pdpt = null;
-    uint64_t *pd   = null;
-    uint64_t *pt   = null;
+    uint64_t *pdpt = NULL;
+    uint64_t *pd   = NULL;
+    uint64_t *pt   = NULL;
     uint64_t  base = 0x0;
 
-    // get pml4e (null if not present)
+    // get pml4e (NULL if not present)
     uint64_t pml4e = k_pml4[PML4_IDX(virt)];
     if (!(pml4e & PTE_PRESENT)) return 0x0;
     pdpt = PHYS_TO_VIRT(pml4e & PTE_ADDR_MASK);
 
-    // get pdpte (null if not present, huge page if PS flag set)
+    // get pdpte (NULL if not present, huge page if PS flag set)
     uint64_t pdpte = pdpt[PDPT_IDX(virt)];
     if (!(pdpte & PTE_PRESENT)) return 0x0;
     if (pdpte & PTE_PS) { 
@@ -71,7 +71,7 @@ uint64_t vmm_translate(uint64_t virt) {
     }
     pt = PHYS_TO_VIRT(pde & PTE_ADDR_MASK);
 
-    // get pte (null if not present)
+    // get pte (NULL if not present)
     uint64_t pte = pt[PT_IDX(virt)];
     if (!(pte & PTE_PRESENT)) return 0x0;
 
@@ -118,7 +118,7 @@ void vmm_test() {
 
     result = vmm_translate(0xFFFF800000000000);
     serial_printf(
-        "[vmm_test] translate(0xFFFF800000000000) = %x (expected: null)\n",
+        "[vmm_test] translate(0xFFFF800000000000) = %x (expected: NULL)\n",
         (void*[]){&result}
     );
 
@@ -152,16 +152,16 @@ void vmm_test() {
     trns = vmm_translate(virt);
     
     serial_printf(
-        "[vmm_test] transated = %x (expected: null)\n", 
+        "[vmm_test] transated = %x (expected: NULL)\n", 
         (void*[]){&trns}
     );
 
-    // test permissions
-    uint64_t r_phys = pmm_alloc(0);
-    uint64_t r_virt = 0xCAFEBABE;
-    vmm_map(k_pml4, r_virt, r_phys, 0);
+    // uncomment to test permissions
+    // uint64_t r_phys = pmm_alloc(0);
+    // uint64_t r_virt = 0xCAFEBABE;
+    // vmm_map(k_pml4, r_virt, r_phys, 0);
 
-    serial_print("[vmm_test] write to read-only memory\n");
-    *(uint64_t *)r_virt = 0xCAFEBABE;
-    serial_print("[vmm_test] if we reached this point, permissions enforcement failed.\n");
+    // serial_print("[vmm_test] write to read-only memory\n");
+    // *(uint64_t *)r_virt = 0xCAFEBABE;
+    // serial_print("[vmm_test] if we reached this point, permissions enforcement failed.\n");
 }
