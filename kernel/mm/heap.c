@@ -69,16 +69,13 @@ void *grow_heap(uint64_t size) {
 void *kmalloc(uint64_t size) {
     if (!size) return NULL;
     uint64_t temp_sz = size + 32;
-    serial_printf("Made it to (0) [%u] [%u].\n", (void*[]){&size, &temp_sz});
     size = (size + 15) & ~15ULL;
     uint8_t bin = size_to_bin(size);
-    serial_printf("Made it to (1) [%u] [%u].\n", (void*[]){&size, &temp_sz});
 
     // search all bins >= size
     for (uint64_t i = bin; i < NUM_BINS; i++) {
         struct heap_block *cur  = bins[i];
         struct heap_block *prev = NULL;
-        serial_printf("Made it to (2) [%u].\n", (void*[]){&i});
 
         while (cur) {
             if (cur->size >= size) {
@@ -92,7 +89,6 @@ void *kmalloc(uint64_t size) {
 
                 // if >= 16 bytes leftover, split that into another bin
                 uint64_t remaining = cur->size - size;
-                serial_printf("Made it to (3).\n", (void*[]){});
                 
                 if (remaining >= sizeof(struct heap_block) + MIN_SPLIT_SZ) {
                     struct heap_block *leftover = 
@@ -203,5 +199,5 @@ void heap_test() {
     kfree(b);
     kfree(c);
     kfree(d);
-    
+
 }

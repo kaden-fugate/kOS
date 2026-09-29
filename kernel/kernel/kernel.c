@@ -1,6 +1,8 @@
 #include <stdint.h>
 
 #include "drivers/serial.h"
+#include "drivers/pic.h"
+#include "drivers/pit.h"
 
 #include "kernel/gdt.h"
 #include "kernel/idt.h"
@@ -28,6 +30,13 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
 
     heap_init();
     heap_test();
+
+    asm volatile("cli");
+    pic_remap();
+    pic_set_mask(0xFFFF);
+    pit_init(100);
+    pic_set_mask(0xFFFE);
+    asm volatile("sti");
 
     for (;;) {
         asm volatile("hlt");

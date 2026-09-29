@@ -57,6 +57,8 @@ ISR_NOERR 29
 ISR_NOERR 30
 ISR_NOERR 31
 
+ISR_NOERR 32
+
 ; every stub will jump here
 isr_common_stub:
     ; save the registers not already saved by the cpu in the order that idt.h's
@@ -80,7 +82,11 @@ isr_common_stub:
     ; move a pointer to everything we just pushed into rdi. this will be the
     ; argument for our C handler (see idt.c for more info)
     mov rdi, rsp
+    
+    cld
+    sub rsp, 8
     call idt_common_handler
+    add rsp, 8
 
     ; restore all registers
     pop r15
