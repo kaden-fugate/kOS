@@ -1,10 +1,15 @@
 #include "kernel/idt.h"
 #include "drivers/serial.h"
+#include "drivers/pic.h"
 
 // 256 possible vectors, 32 cpu-defined exceptions.
 #define IDT_ENTRIES 256
+#define PIT_IRQ_VEC 0x20
+
 struct idt_entry idt[IDT_ENTRIES];  // the table itself
 struct idt_ptr idtp;                 // what we hand to `lidt`
+
+static volatile uint64_t pit_ticks = 0;
 
 // declare the 32 labels defined in isr.asm.
 extern void isr0(void);
@@ -39,6 +44,8 @@ extern void isr28(void);
 extern void isr29(void);
 extern void isr30(void);
 extern void isr31(void);
+
+extern void isr32(void);
 
 static void idt_set_entry(int vector, void (*handler)(void), uint8_t type_attr) {
     uint64_t addr = (uint64_t)handler;
@@ -100,6 +107,8 @@ void idt_init(void) {
     idt_set_entry(30, isr30, flags);
     idt_set_entry(31, isr31, flags);
 
+    idt_set_entry(PIT_IRQ_VEC, isr32, flags);
+
     // ** remaining 224 entries are zero'd out **
 
     // populate idt ptr to be loaded using lidt
@@ -112,20 +121,53 @@ void idt_init(void) {
 
 // self explanatory... right?
 static const char *exception_names[32] = {
-    "Divide by zero", "Debug", "NMI", "Breakpoint", "Overflow", 
-    "Bound range exceeded", "Invalid opcode", "Device not available", 
-    "Double fault", "Coprocessor segment overrun", "Invalid TSS", 
-    "Segment not present", "Stack-segment fault", "General protection fault", 
-    "Page fault", "Reserved", "x87 floating point exception", 
-    "Alignment check", "Machine check", "SIMD floating point exception",
-    "Virtualization exception", "Control protection exception", "Reserved", 
-    "Reserved", "Reserved", "Reserved", "Reserved", "Reserved",
-    "Hypervisor injection exception", "VMM communication exception", 
-    "Security exception", "Reserved"
+    "Divide by zero", 
+    "Debug", 
+    "NMI", 
+    "Breakpoint", 
+    "Overflow", 
+    "Bound range exceeded", 
+    "Invalid opcode", 
+    "Device not available", 
+    "Double fault", 
+    "Coprocessor segment overrun", 
+    "Invalid TSS", 
+    "Segment not present", 
+    "Stack-segment fault", 
+    "General protection fault", 
+    "Page fault", 
+    "Reserved", 
+    "x87 floating point exception", 
+    "Alignment check", 
+    "Machine check", 
+    "SIMD floating point exception",
+    "Virtualization exception", 
+    "Control protection exception", 
+    "Reserved", 
+    "Reserved", 
+    "Reserved", 
+    "Reserved", 
+    "Reserved", 
+    "Reserved",
+    "Hypervisor injection exception", 
+    "VMM communication exception", 
+    "Security exception", 
+    "Reserved"
 };
 
-
 void idt_common_handler(struct interrupt_frame *frame) {
+
+    if (frame->vector == 0x20) {
+        pit_ticks++;
+
+        pic_send_eoi(0);
+
+        if ((pit_ticks % 200) == 0) {
+            serial_print("PIT: two seconds passed\n");
+        }
+
+        return;
+    }
     
     // 14: page fault
     if (frame->vector == 14) {
@@ -135,11 +177,16 @@ void idt_common_handler(struct interrupt_frame *frame) {
         asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
 
         serial_printf("PAGE FAULT (%x)\n", (void*[]){&fault_addr});
-    } else {
+    } 
+    else if (frame->vector < 32) {
         serial_print("EXCEPTION: ");
         serial_print(exception_names[frame->vector]);
         serial_print("\n");
+    } 
+    else {
+        serial_print("Unhandled interrupt\n");
     }
+
 
     // just halt forever on these exceptions
     for (;;) {

@@ -1,5 +1,5 @@
-#ifndef DEF_H
-#define DEF_H
+#ifndef MM_DEF_H
+#define MM_DEF_H
 
 #include <stdint.h>
 
