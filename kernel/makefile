@@ -23,11 +23,15 @@ out/isr.o: boot/isr.asm
 	@mkdir -p out
 	nasm -f elf64 $< -o $@
 
+out/switch.o: kernel/switch.asm
+	@mkdir -p out
+	nasm -f elf64 $< -o $@
+
 out/%.o: %.c
 	@mkdir -p out
 	$(CC) $(CFLAGS) -c $< -o $@
 
-out/kernel.bin: out/boot.o out/isr.o $(OBJ_C)
+out/kernel.bin: out/boot.o out/isr.o out/switch.o $(OBJ_C)
 	$(LD) $(LDFLAGS) -o $@ $^
 
 kos.iso: out/kernel.bin

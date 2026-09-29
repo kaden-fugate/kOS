@@ -1,6 +1,7 @@
 #include "kernel/idt.h"
 #include "drivers/serial.h"
 #include "drivers/pic.h"
+#include "kernel/task.h"
 
 // 256 possible vectors, 32 cpu-defined exceptions.
 #define IDT_ENTRIES 256
@@ -162,9 +163,8 @@ void idt_common_handler(struct interrupt_frame *frame) {
 
         pic_send_eoi(0);
 
-        if ((pit_ticks % 200) == 0) {
-            serial_print("PIT: two seconds passed\n");
-        }
+        if ((pit_ticks % (100)) == 0) 
+            schedule();
 
         return;
     }

@@ -6,6 +6,7 @@
 
 #include "kernel/gdt.h"
 #include "kernel/idt.h"
+#include "kernel/task.h"
 
 #include "mm/pmm.h"
 #include "mm/vmm.h"
@@ -37,6 +38,15 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
     pit_init(100);
     pic_set_mask(0xFFFE);
     asm volatile("sti");
+
+    task_b         = task_create(task_b_main);
+    boot_task.next = task_b;
+    task_b->next   = &boot_task;
+
+    for (;;) {
+        serial_print("A\n");
+        asm volatile("hlt");
+    }
 
     for (;;) {
         asm volatile("hlt");
