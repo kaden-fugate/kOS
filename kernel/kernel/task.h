@@ -9,16 +9,21 @@ extern struct task boot_task;
 extern struct task *current;
 extern struct task *task_b;
 
+enum task_state { TASK_READY, TASK_RUNNING, TASK_DEAD };
+
 struct task {
-    uint64_t rsp;       // saved stack ptr
-    uint8_t *stk_base;  // base of the stack
-    struct task *next;  // next task to run
+    uint64_t                 rsp;       // saved stack ptr
+    uint8_t                 *stk_base;  // base of the stack
+    struct task             *next;      // next task to run
+    volatile enum task_state state;     // task state
 };
 
 struct task *task_create(void (*)(void));
-void switch_context(uint64_t*, uint64_t);
-void task_exit();
 void schedule();
-void task_b_main();
+void task_init();
+void task_add(struct task*);
+void task_exit();
+void task_join(struct task*);
+void task_reap(struct task*);
 
 #endif

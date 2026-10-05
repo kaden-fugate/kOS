@@ -5,6 +5,34 @@ static uint64_t total_blocks;
 
 /* ------------------------------------------------------------------------- *\
 |                                                                             |
+| static name: free_list                                                      |
+| description: a linked list for each order of block size (so.. an array of   |
+|              heads to linked lists).                                        |
+|                                                                             |
+\* ------------------------------------------------------------------------- */
+static struct free_block *free_list[MAX_ORDER + 1];
+
+/* ------------------------------------------------------------------------- *\
+|                                                                             |
+| static name: order_bm                                                       |
+| description: array of pointers to bytes. each array of bytes is a bitmap    |
+|              telling us what block in the given order is free.              |
+|                                                                             |
+\* ------------------------------------------------------------------------- */
+static uint8_t *order_bm[MAX_ORDER + 1];
+
+/* ------------------------------------------------------------------------- *\
+|                                                                             |
+| static name: order_blk_cnt                                                  |
+| description: array of number of blocks needed for each order in our buddy   |
+|              allocator. we need this to determine the number of bytes to    |
+|              allocate to each array in order_bm.                            |
+|                                                                             |
+\* ------------------------------------------------------------------------- */
+static uint64_t order_blk_cnt[MAX_ORDER + 1];
+
+/* ------------------------------------------------------------------------- *\
+|                                                                             |
 | function name: buddy_alloc                                                  |
 | description:   when seed_region finds a block size at a given order and a   |
 |                given starting page, we need to actually set these pages to  |
