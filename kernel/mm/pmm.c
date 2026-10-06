@@ -1,5 +1,7 @@
-#include "mm/pmm.h"
+#include "pmm.h"
+
 #include "drivers/serial.h"
+#include "kernel/cpu.h"
 
 static uint64_t total_blocks;
 
@@ -341,19 +343,15 @@ void pmm_init(uint32_t info_addr) {
             uint64_t frame_start = (rgn_start + PAGE_SIZE - 1) / PAGE_SIZE;    // [SECTION 3.0 -> 3.a.i] first page in memory region
             uint64_t frame_end   = rgn_end / PAGE_SIZE;
 
-            if (!frame_start) ++frame_start;                                   // [SECTION 3.0 -> 3.a.ii] if that first page is at NULL, we skip it
+            uint64_t seed_start = frame_start;
+            if (seed_start < reserved_end)
+                seed_start = reserved_end;
+
+            if (seed_start < frame_end) {
+                seed_region(seed_start, frame_end);
+                free_bytes += (frame_end - seed_start) * PAGE_SIZE;
+            }
             
-            uint64_t left_end = frame_end < reserved_start 
-                                ? frame_end : reserved_start;
-            if (frame_start < left_end) 
-                seed_region(frame_start, left_end);
-            
-            uint64_t right_start = frame_start > reserved_end 
-                                   ? frame_start : reserved_end;
-            if (right_start < frame_end)
-                seed_region(right_start, frame_end);
-            
-            free_bytes += rgn_end - rgn_start;
         }
         ent_ptr += ent_sz;
     }
@@ -363,10 +361,7 @@ void pmm_init(uint32_t info_addr) {
 
 }
 
-uint64_t pmm_alloc(uint64_t order) {
-
-    if (order > MAX_ORDER) return 0x0;
-
+uint64_t pmm_alloc_locked(uint64_t order) {
     uint64_t found_order = order;
     while (found_order <= MAX_ORDER && free_list[found_order] == NULL) 
         ++found_order;
@@ -401,19 +396,25 @@ uint64_t pmm_alloc(uint64_t order) {
     return (uint64_t) addr;
 }
 
-void pmm_free(uint64_t addr, uint64_t order) {
-    if (order > MAX_ORDER || (addr % (PAGE_SIZE << order)) != 0) return;
+uint64_t pmm_alloc(uint64_t order) {
+    if (order > MAX_ORDER) return 0x0;
+    uint64_t f = irq_save();
+    uint64_t p = pmm_alloc_locked(order);
+    irq_restore(f);
+    return p;
+}
 
+void pmm_free_locked(uint64_t addr, uint64_t order) {
     struct free_block *node = NULL;
 
     uint64_t page = addr / PAGE_SIZE;
     uint64_t buddy_page;
-    uint64_t block_idx;
+    uint64_t block_idx = page >> order;
     uint64_t buddy;
     uint8_t  mask;
     uint8_t  cur_mask = (uint8_t) (1ULL << (block_idx % 8));
 
-    if (order_bm[order][block_idx / 8] & cur_mask == 0x0) return;              // no double frees
+    if ((order_bm[order][block_idx / 8] & cur_mask) == 0x0) return;            // no double frees
 
     // check if buddy at cur order is also free
     while (order < MAX_ORDER) {
@@ -443,6 +444,47 @@ void pmm_free(uint64_t addr, uint64_t order) {
 
     // seed region
     buddy_alloc(page, order);
+}
+
+void pmm_free(uint64_t addr, uint64_t order) {
+    if (order > MAX_ORDER || (addr % (PAGE_SIZE << order)) != 0) return;
+    uint64_t f = irq_save();
+    pmm_free_locked(addr, order);
+    irq_restore(f);
+}
+
+uint64_t pmm_free_bytes() {
+    uint64_t f = irq_save();
+    uint64_t total = 0;
+    for (uint64_t ord = 0; ord <= MAX_ORDER; ++ord) {
+        uint64_t n = 0;
+        for (struct free_block *c = free_list[ord]; c; c = c->next) {
+            if (++n > total_blocks) { irq_restore(f); return (uint64_t)-1; }  // cycle
+            total += (1ULL << ord) * PAGE_SIZE;
+        }
+    }
+    irq_restore(f);
+    return total;
+}
+
+uint64_t pmm_check() {
+    uint64_t f = irq_save();
+    uint64_t errors = 0;
+    for (uint64_t ord = 0; ord <= MAX_ORDER; ++ord) {
+        uint64_t n = 0;
+        struct free_block *prev = 0x0;
+        for (struct free_block *c = free_list[ord]; c; c = c->next) {
+            if (++n > total_blocks) { errors++; break; }                 // cycle
+            if (c->prev != prev) errors++;                                // back-link mismatch
+            uint64_t frame = (uint64_t)c / PAGE_SIZE;
+            if (frame % (1ULL << ord)) errors++;                          // misaligned for its order
+            uint64_t idx = frame >> ord;
+            if (order_bm[ord][idx / 8] & (1 << (idx % 8))) errors++;      // on free list but marked used
+            prev = c;
+        }
+    }
+    irq_restore(f);
+    return errors;
 }
 
 void pmm_test() {

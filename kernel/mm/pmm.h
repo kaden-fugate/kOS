@@ -44,6 +44,8 @@ void pmm_init(uint32_t);
 uint64_t pmm_alloc(uint64_t);
 
 void pmm_free(uint64_t, uint64_t);
+uint64_t pmm_free_bytes();
+uint64_t pmm_check();
 void pmm_test();
 
 /* ------------------------------------------------------------------------- *\

@@ -1,4 +1,5 @@
-#include "kernel/task.h"
+#include "task.h"
+
 #include "drivers/serial.h"
 #include "mm/heap.h"
 #include "cpu.h"
@@ -6,6 +7,8 @@
 struct task boot_task;
 struct task *current;
 struct task *task_b;
+
+extern void switch_context(uint64_t*, uint64_t);
 
 struct task *task_create(void (*entry)(void)) {
     struct task *t = kmalloc(sizeof(struct task));
