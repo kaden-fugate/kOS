@@ -1,4 +1,5 @@
 #include "serial.h"
+#include "kernel/cpu.h"
 
 void serial_init(void) {
     outb(COM1 + 1, 0x00); // disable interrupts
@@ -20,7 +21,9 @@ void serial_putc(char c) {
 }
 
 void serial_print(const char *s) {
+    uint64_t f = irq_save();
     for (int i = 0; s[i]; i++) serial_putc(s[i]);
+    irq_restore(f);
 }
 
 void serial_print_uint(uint64_t val, int base) {
@@ -50,7 +53,7 @@ void serial_print_int(int64_t val) {
     serial_print_uint(val, 10);
 }
 
-void serial_printf(const char *frmt, void *argv[]) {
+static void serial_printf_locked(const char *frmt, void *argv[]) {
     // while we havent reached a NULL terminator
     //  iterate through the format
     //  if we see %, look at the next character:
@@ -98,4 +101,10 @@ void serial_printf(const char *frmt, void *argv[]) {
                 continue;
         }
     }
+}
+
+void serial_printf(const char *frmt, void *argv[]) {
+    uint64_t f = irq_save();
+    serial_printf_locked(frmt, argv);
+    irq_restore(f);
 }

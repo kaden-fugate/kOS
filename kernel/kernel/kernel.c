@@ -12,43 +12,27 @@
 #include "mm/vmm.h"
 #include "mm/heap.h"
 
+#include "tests/ktest.h"
+
 void kernel_main(uint32_t info_ptr, uint32_t magic) {
     serial_init();
-    serial_print("Hello, friend!\n");
-
     gdt_init();
     idt_init();
-    
-    // test idt is working (keep uncommented if you dont want things to break)
-    // int x = 1 / 0;
-    // serial_print("If you see this, IDT didn't work! :(\n");
-
     pmm_init(info_ptr);
-    pmm_test();
-
     vmm_init();
-    vmm_test();
-
     heap_init();
-    heap_test();
+    ktest();
 
     asm volatile("cli");
     pic_remap();
     pic_set_mask(0xFFFF);
     pit_init(100);
     pic_set_mask(0xFFFE);
+    
+    task_init();
     asm volatile("sti");
 
-    task_b         = task_create(task_b_main);
-    boot_task.next = task_b;
-    task_b->next   = &boot_task;
+    pre_emption_test();
 
-    for (;;) {
-        serial_print("A\n");
-        asm volatile("hlt");
-    }
-
-    for (;;) {
-        asm volatile("hlt");
-    }
+    for (;;) asm volatile("hlt");
 }

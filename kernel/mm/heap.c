@@ -3,7 +3,12 @@
 
 #include "drivers/serial.h"
 
+#include "kernel/cpu.h"
+
 static uint64_t heap_cur = HEAP_VIRT_BASE;
+
+void *kmalloc_locked(uint64_t);
+void kfree_locked(void*);
 
 uint8_t size_to_bin(uint64_t size) {
     for (int i = 0; i < NUM_BINS - 1; i++) {
@@ -67,6 +72,13 @@ void *grow_heap(uint64_t size) {
 }
 
 void *kmalloc(uint64_t size) {
+    uint64_t f = irq_save();
+    void *p = kmalloc_locked(size);
+    irq_restore(f);
+    return p;
+}
+
+void *kmalloc_locked(uint64_t size) {
     if (!size) return NULL;
     uint64_t temp_sz = size + 32;
     size = (size + 15) & ~15ULL;
@@ -104,10 +116,8 @@ void *kmalloc(uint64_t size) {
 
                     bins[leftover_bin] = leftover;
                     cur->size = size;
-                    serial_printf("%u bytes remaining.\n", (void*[]){&leftover->size});
                 }
                 temp_sz = size + 32;
-                serial_printf("allocated %u bytes.\n", (void*[]){&temp_sz});
                 cur->free = 0;
                 return (void *)(cur + 1);
             }
@@ -120,7 +130,13 @@ void *kmalloc(uint64_t size) {
     return grow_heap(size);
 }
 
-void kfree(void *ptr) {
+void kfree(void *p) {
+    uint64_t f = irq_save();
+    kfree_locked(p);
+    irq_restore(f);
+}
+
+void kfree_locked(void *ptr) {
 
     // make new heap_block
     struct heap_block *block = (struct heap_block *)ptr - 1;

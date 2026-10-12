@@ -44,6 +44,8 @@ void pmm_init(uint32_t);
 uint64_t pmm_alloc(uint64_t);
 
 void pmm_free(uint64_t, uint64_t);
+uint64_t pmm_free_bytes();
+uint64_t pmm_check();
 void pmm_test();
 
 /* ------------------------------------------------------------------------- *\
@@ -97,33 +99,5 @@ struct free_block {
     struct free_block *next;
     struct free_block *prev;
 };
-
-/* ------------------------------------------------------------------------- *\
-|                                                                             |
-| static name: free_list                                                      |
-| description: a linked list for each order of block size (so.. an array of   |
-|              heads to linked lists).                                        |
-|                                                                             |
-\* ------------------------------------------------------------------------- */
-static struct free_block *free_list[MAX_ORDER + 1];
-
-/* ------------------------------------------------------------------------- *\
-|                                                                             |
-| static name: order_bm                                                       |
-| description: array of pointers to bytes. each array of bytes is a bitmap    |
-|              telling us what block in the given order is free.              |
-|                                                                             |
-\* ------------------------------------------------------------------------- */
-static uint8_t *order_bm[MAX_ORDER + 1];
-
-/* ------------------------------------------------------------------------- *\
-|                                                                             |
-| static name: order_blk_cnt                                                  |
-| description: array of number of blocks needed for each order in our buddy   |
-|              allocator. we need this to determine the number of bytes to    |
-|              allocate to each array in order_bm.                            |
-|                                                                             |
-\* ------------------------------------------------------------------------- */
-static uint64_t order_blk_cnt[MAX_ORDER + 1];
 
 #endif

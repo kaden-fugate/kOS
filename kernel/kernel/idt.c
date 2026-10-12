@@ -163,8 +163,8 @@ void idt_common_handler(struct interrupt_frame *frame) {
 
         pic_send_eoi(0);
 
-        if ((pit_ticks % (100)) == 0) 
-            schedule();
+        // if ((pit_ticks % 2) == 0) 
+        schedule();
 
         return;
     }
