@@ -12,6 +12,7 @@
 
 #include "heap_stress.h"
 #include "pmm_stress.h"
+#include "vmm_stress.h"
 
 uint8_t stall() {
     while( !(current == &boot_task && current->next == &boot_task) ) 
@@ -35,6 +36,9 @@ void pre_emption_test() {
     stall();
 
     run_pmm_test();
+    stall();
+
+    run_vmm_test();
     stall();
 
     serial_print("[pre_emption_test]: done.\n");

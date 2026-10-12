@@ -71,7 +71,6 @@ static void task_remove(struct task *t) {
 }
 
 void task_exit() {
-    serial_print("[task] exited\n");
     irq_save();
     current->state = TASK_DEAD;
     task_remove(current);

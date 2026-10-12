@@ -1,6 +1,7 @@
 #include "mm/vmm.h"
 #include "mm/pmm.h"
 #include "drivers/serial.h"
+#include "kernel/cpu.h"
 #include "kutil/string.h"
 
 uint64_t *k_pml4 = NULL;
@@ -14,24 +15,38 @@ void vmm_init() {
 }
 
 static uint64_t *get_or_create_table(uint64_t *parent_ent) {
-    // if parent entry not preesnt:
+    
+    // if existing and is a huge table, return null DO NOT MAP!
+    if ((*parent_ent & PTE_PRESENT) && (*parent_ent & PTE_PS)) 
+        return NULL;
+
+    // if parent entry not present:
     //  allocate physical memory for table (order 0)
     //  set table to point to physical mem + present flag + writeable + user
     if (!(*parent_ent & PTE_PRESENT)) {
         uint64_t new_table = pmm_alloc(0);
+        if (!new_table) return NULL;
+        
         memset((void*)PHYS_TO_VIRT(new_table), 0, PAGE_SIZE);
-        *parent_ent = new_table | PTE_PRESENT | PTE_WRITEABLE | PTE_USER;
+        *parent_ent = new_table | PTE_PRESENT | PTE_WRITEABLE;
     }
 
     // return parent entrys physical address
     return PHYS_TO_VIRT(*parent_ent & PTE_ADDR_MASK);
 }
 
-void vmm_map(uint64_t *pml4, uint64_t virt, uint64_t phys, uint64_t flags) {
+static void vmm_map_locked(uint64_t *pml4, uint64_t virt, uint64_t phys, 
+    uint64_t flags) 
+{
     // get pdpt, pd, pt
     uint64_t *pdpt = get_or_create_table(&pml4[PML4_IDX(virt)]);
+    if (!pdpt) return;
+
     uint64_t *pd   = get_or_create_table(&pdpt[PDPT_IDX(virt)]);
+    if (!pd) return;
+    
     uint64_t *pt   = get_or_create_table(&pd[PD_IDX(virt)]);
+    if (!pt) return;
 
     // map PTE to phys with given flags + present
     pt[PT_IDX(virt)] = (phys & PTE_ADDR_MASK) | PTE_PRESENT | flags;
@@ -40,7 +55,13 @@ void vmm_map(uint64_t *pml4, uint64_t virt, uint64_t phys, uint64_t flags) {
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 
-uint64_t vmm_translate(uint64_t virt) {
+void vmm_map(uint64_t *pml4, uint64_t virt, uint64_t phys, uint64_t flags) {
+    uint64_t f = irq_save();
+    vmm_map_locked(pml4, virt, phys, flags);
+    irq_restore(f);
+}
+
+static uint64_t vmm_translate_locked(uint64_t virt) {
     uint64_t *pdpt = NULL;
     uint64_t *pd   = NULL;
     uint64_t *pt   = NULL;
@@ -79,28 +100,42 @@ uint64_t vmm_translate(uint64_t virt) {
     return base | (virt & 0xFFF);
 }
 
-void vmm_unmap(uint64_t *pml4, uint64_t virt) {
-    uint64_t *pdpt = PHYS_TO_VIRT(pml4[PML4_IDX(virt)] & PTE_ADDR_MASK);
-    if (!(pml4[PML4_IDX(virt)] & PTE_PRESENT)) return;
+uint64_t vmm_translate(uint64_t virt) {
+    uint64_t f = irq_save();
+    uint64_t v = vmm_translate_locked(virt);
+    irq_restore(f);
+    return v;
+}
 
-    uint64_t *pd = PHYS_TO_VIRT(pdpt[PDPT_IDX(virt)] & PTE_ADDR_MASK);
-    if (!(pdpt[PDPT_IDX(virt)] & PTE_PRESENT)) return;
+static void vmm_unmap_locked(uint64_t *pml4, uint64_t virt) {
+    uint64_t pml4e = pml4[PML4_IDX(virt)];
+    if (!(pml4e & PTE_PRESENT)) return;
 
-    uint64_t *pt = PHYS_TO_VIRT(pd[PD_IDX(virt)] & PTE_ADDR_MASK);
-    if (!(pd[PD_IDX(virt)] & PTE_PRESENT)) return;
+    uint64_t *pdpt = PHYS_TO_VIRT(pml4e & PTE_ADDR_MASK);
+    uint64_t pdpte = pdpt[PDPT_IDX(virt)];
+    if (!(pdpte & PTE_PRESENT) || (pdpte & PTE_PS)) return;
 
-    pt[PT_IDX(virt)] = 0x0;
+    uint64_t *pd = PHYS_TO_VIRT(pdpte & PTE_ADDR_MASK);
+    uint64_t pde = pd[PD_IDX(virt)];
+    if (!(pde & PTE_PRESENT) || (pde & PTE_PS)) return;
+
+    uint64_t *pt = PHYS_TO_VIRT(pde & PTE_ADDR_MASK);
+    pt[PT_IDX(virt)] = 0;
     asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
 }
 
-uint64_t vmm_alloc(
-    uint64_t *pml4, uint64_t virt, uint8_t order, uint64_t flags
-) {
+void vmm_unmap(uint64_t *pml4, uint64_t virt) {
+    uint64_t f = irq_save();
+    vmm_unmap_locked(pml4, virt);
+    irq_restore(f);
+}
+
+uint64_t vmm_alloc(uint64_t *pml4, uint64_t virt, uint8_t order, uint64_t flags) {
     uint64_t phys = pmm_alloc(order);
     if (!phys) return 0x0;
 
     uint64_t n_pages = 1ULL << order;
-    for (int i = 0; i < n_pages; i++) {
+    for (uint64_t i = 0; i < n_pages; i++) {
         vmm_map(pml4, virt + (i * PAGE_SIZE), phys + (i * PAGE_SIZE), flags);
     }
 
