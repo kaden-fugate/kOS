@@ -1,7 +1,8 @@
 CC = x86_64-elf-gcc
 LD = x86_64-elf-ld
 
-CFLAGS = -m64 -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -I.
+CFLAGS = -m64 -ffreestanding -fno-stack-protector -fno-pic -fno-pie \
+		 	-mno-red-zone -mcmodel=kernel -I.
 LDFLAGS = -n -T linker.ld
 
 OVMF = /opt/homebrew/Cellar/qemu/11.0.3/share/qemu/edk2-x86_64-code.fd

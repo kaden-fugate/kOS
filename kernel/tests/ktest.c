@@ -19,8 +19,18 @@ uint8_t stall() {
         asm volatile("hlt");
 }
 
-void ktest() {
-    serial_print("Hello, friend!\n");
+void ktest(void (*p)(uint32_t, uint32_t)) {
+    serial_print("Welcome to kOS.\n");
+
+    uint64_t rip;
+    asm volatile("lea 0(%%rip), %0" : "=r"(rip));
+
+    uint64_t rsp;
+    asm volatile("mov %%rsp, %0" : "=r"(rsp));
+
+    serial_printf("[higher-half] kernel_main= %x \n", (void*[]){&p});
+    serial_printf("[higher-half] RIP= %x \n", (void*[]){&rip});
+    serial_printf("[higher-half] RSP= %x \n", (void*[]){&rsp});
     
     // test idt is working (keep uncommented if you dont want things to break)
     // int x = 1 / 0;

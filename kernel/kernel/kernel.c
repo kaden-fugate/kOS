@@ -21,7 +21,7 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
     pmm_init(info_ptr);
     vmm_init();
     heap_init();
-    ktest();
+    ktest(kernel_main);
 
     asm volatile("cli");
     pic_remap();

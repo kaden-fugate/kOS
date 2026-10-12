@@ -18,7 +18,7 @@ static const uint64_t bin_sizes[NUM_BINS] = {
 };
 static struct heap_block *bins[NUM_BINS] = { NULL };
 
-#define HEAP_VIRT_BASE 0xDEADB000ULL
+#define HEAP_VIRT_BASE 0xFFFF900000000000ULL
 
 void  heap_init();
 void *kmalloc(uint64_t);
