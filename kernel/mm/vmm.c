@@ -7,8 +7,11 @@
 uint64_t *k_pml4 = NULL;
 
 void vmm_init() {
+    k_pml4[0] = 0;
+
     uint64_t cr3;
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
+    asm volatile("mov %0, %%cr3" : : "r"(cr3) : "memory");
 
     k_pml4 = PHYS_TO_VIRT(cr3 & PTE_ADDR_MASK);
     serial_printf("[vmm_init] k_pml4 at: %x\n", (void*[]){&k_pml4});
@@ -145,21 +148,21 @@ uint64_t vmm_alloc(uint64_t *pml4, uint64_t virt, uint8_t order, uint64_t flags)
 void vmm_test() {
     
     // test vmm_translate
-    uint64_t result = vmm_translate(0x100000);
+    uint64_t result = vmm_translate(PHYS_MAP_BASE + 0x100000);
     serial_printf(
-        "[vmm_test] translate(0x100000) = %x (expected: 0x100000)\n",
+        "[vmm_test] translate(PHYS_MAP_BASE + 0x100000) = %x (expected: 0x100000)\n",
         (void*[]){&result}
     );
 
-    result = vmm_translate(0xFFFF800000000000);
+    result = vmm_translate(0xFFFFA00000000000ULL);
     serial_printf(
-        "[vmm_test] translate(0xFFFF800000000000) = %x (expected: NULL)\n",
+        "[vmm_test] translate(0xFFFFA00000000000) = %x (expected: NULL)\n",
         (void*[]){&result}
     );
 
     // test vmm_map
     uint64_t phys = pmm_alloc(0);
-    uint64_t virt = 0xFFFF800000000000;
+    uint64_t virt = 0xFFFFA00000000000ULL;
     
     vmm_map(k_pml4, virt, phys, PTE_WRITEABLE);
     uint64_t trns = vmm_translate(virt);
@@ -176,7 +179,7 @@ void vmm_test() {
     *test_ptr = 0xCAFEBABE;
     serial_print("[vmm_test] no crash on write to virtual address? :^)\n");
 
-    uint64_t *phys_ptr = (uint64_t *)phys;
+    uint64_t *phys_ptr = PHYS_TO_VIRT(phys);
     serial_printf(
         "[vmm_test] read physical mem = %x (expected: 0xCAFEBABE)\n",
         (void*[]){phys_ptr}

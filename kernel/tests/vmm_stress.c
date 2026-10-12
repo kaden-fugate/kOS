@@ -8,6 +8,9 @@
 #include "drivers/serial.h"
 
 #define VT_ROUNDS 96
+#define VT_PT_BASE   0xFFFFA10000000000ULL
+#define VT_PD_BASE   0xFFFFA20000000000ULL
+#define VT_PDPT_BASE 0xFFFFA40000000000ULL
 
 static uint64_t vt_va[2][VT_ROUNDS];
 static uint64_t vt_pa[2][VT_ROUNDS];
@@ -17,9 +20,9 @@ static volatile uint64_t vt_mapped;
 static uint64_t vt_region(uint64_t r) {
     uint64_t idx = r / 3;
     switch (r % 3) {
-        case 0:  return 0x100000000000ULL + idx * 0x200000ULL;      // new PT
-        case 1:  return 0x200000000000ULL + idx * 0x40000000ULL;    // new PD + PT
-        default: return 0x300000000000ULL + idx * 0x8000000000ULL;  // new PDPT + PD + PT
+        case 0:  return VT_PT_BASE + idx * 0x200000ULL;      // new PT
+        case 1:  return VT_PD_BASE + idx * 0x40000000ULL;    // new PD + PT
+        default: return VT_PDPT_BASE + idx * 0x8000000000ULL;  // new PDPT + PD + PT
     }
 }
 
@@ -36,7 +39,7 @@ static void vt_worker(uint64_t id) {
         if (!pa) vt_fail("OUT OF MEMORY", id, va);
         
         uint64_t stamp = (id << 56) ^ pa ^ r;
-        *(volatile uint64_t *)pa = stamp;
+        *(volatile uint64_t *)PHYS_TO_VIRT(pa) = stamp;
 
         vmm_map(k_pml4, va, pa, PTE_WRITEABLE);
         vt_va[id][r] = va;
@@ -67,8 +70,8 @@ static void vt_worker(uint64_t id) {
     }
 }
 
-void vt_a() {asm volatile("sti"); vt_worker(0x10);}
-void vt_b() {asm volatile("sti"); vt_worker(0x80);}
+void vt_a() {asm volatile("sti"); vt_worker(0);}
+void vt_b() {asm volatile("sti"); vt_worker(1);}
 
 void run_vmm_test() {
     struct task *vmm_test_a = task_create(vt_a);
@@ -81,7 +84,7 @@ void run_vmm_test() {
     while (vt_mapped < 2 && !vt_failed) asm volatile("hlt");
 
     uint64_t after = pmm_free_bytes();
-    uint64_t used = after - before;
+    uint64_t used = before - after;
     uint64_t errs = pmm_check();
     serial_printf("[vmm_stress]: frames used by page tables: %u  pmm errors: %u\n",
                   (void*[]){&used, &errs});

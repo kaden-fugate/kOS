@@ -5,6 +5,7 @@
 #include "kernel/cpu.h"
 #include "kernel/task.h"
 #include "mm/pmm.h"
+#include "mm/def.h"
 
 #define PS_ITERS   0xFFFFF
 #define PS_HELD    12
@@ -49,15 +50,18 @@ static void unclaim(uint64_t addr, uint64_t order) {
 
 // stamp block with addr as a key
 static void stamp_block(struct held *h) {
-    for (uint64_t i = 0; i < (1ULL << h->order); i++) 
-        *(volatile uint64_t *)(h->addr + i * PAGE_SIZE) = h->stamp;
+    for (uint64_t i = 0; i < (1ULL << h->order); i++) {
+        uint64_t phys = h->addr + i * PAGE_SIZE;
+        *(volatile uint64_t *)PHYS_TO_VIRT(phys) = h->stamp;
+    }
 }
 
 // check blocks stamped key
 static int stamp_ok(struct held *h) {
-    for (uint64_t i = 0; i < (1ULL << h->order); i++) 
-        if (*(volatile uint64_t *)(h->addr + i * PAGE_SIZE) != h->stamp)
-            return 0;
+    for (uint64_t i = 0; i < (1ULL << h->order); i++) {
+        uint64_t phys = h->addr + i * PAGE_SIZE;
+        if (*(volatile uint64_t *)(phys) != h->stamp) return 0;
+    }
     return 1;
 }
 

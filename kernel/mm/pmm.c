@@ -50,7 +50,7 @@ static uint64_t order_blk_cnt[MAX_ORDER + 1];
 |                                                                             |
 \* ------------------------------------------------------------------------- */
 void buddy_alloc(uint64_t start, uint8_t order) {
-    struct free_block *free = (struct free_block *) (start * PAGE_SIZE);
+    struct free_block *free = PHYS_TO_VIRT(start * PAGE_SIZE);
     
     // new node will be head, next is cur head, prev is NULL
     free->next = free_list[order];
@@ -176,7 +176,7 @@ void pmm_init(uint32_t info_addr) {
     \* ------------------------------------------------------------------------- */
 
     /* --------------------------- SECTION 1.0 BEGIN ----------------------------*/
-    uint8_t *mb_ptr     = (uint8_t *) (uint64_t) info_addr;                    
+    uint8_t *mb_ptr     = PHYS_TO_VIRT(info_addr);                    
     uint8_t *tag_ptr = mb_ptr + 8;                                             // [SECTION 1.0 -> 1] skip past size + magic
     uint32_t mb_size  = *(uint32_t *) mb_ptr;                                  // [SECTION 1.0 -> 2] multiboot header defines size of tag region
 
@@ -270,24 +270,23 @@ void pmm_init(uint32_t info_addr) {
 
     /* --------------------------- SECTION 2.1 BEGIN ----------------------------*/
     total_blocks     = ((uint64_t) mmap_end / PAGE_SIZE);                      // [SECTION 2.1 -> 1] total number of pages we can fit into mmap
-    uint8_t *dat_ptr = (uint8_t *) &kernel_end;                                // [SECTION 2.1 -> 2] this is where we'll store order_bm :)
+    uint64_t dat_ptr = KERNEL_VIRT_TO_PHYS((uint64_t)&kernel_end);             // [SECTION 2.1 -> 2] this is where we'll store order_bm :)
 
     for (uint64_t ord = 0; ord <= MAX_ORDER; ++ord) {                          // [SECTION 2.1 -> 3] for each order (asc)
 
         order_blk_cnt[ord] = total_blocks >> ord;                              // [SECTION 2.1 -> 3.a] number of blocks that fit this order
         uint64_t num_b = (order_blk_cnt[ord] + 7) / 8;                         // [SECTION 2.1 -> 3.b] this is the number of bytes required
 
-        order_bm[ord] = dat_ptr;                                               // [SECTION 2.1 -> 3.b] actually allocate the mem for bitmap
+        order_bm[ord] = PHYS_TO_VIRT(dat_ptr);                                 // [SECTION 2.1 -> 3.b] actually allocate the mem for bitmap
         dat_ptr      += num_b;
         
         for (uint64_t byte = 0; byte < num_b; ++byte)
             order_bm[ord][byte] = (uint8_t) 0xFF;                              // [SECTION 2.1 -> 3.c] set all blocks as reserved
     
-        free_list[ord] = NULL;                                                  // [SECTION 2.1 -> 3.d] free_list for order points to NULL
+        free_list[ord] = NULL;                                                 // [SECTION 2.1 -> 3.d] free_list for order points to NULL
 
     }
 
-    uint8_t *dat_end = dat_ptr;                                                // [SECTION2.1 -> 4] end of order_bm
     /* ---------------------------- SECTION 2.0 END -----------------------------*/
 
     /* ------------------------------------------------------------------------- *\
@@ -324,12 +323,11 @@ void pmm_init(uint32_t info_addr) {
     uint64_t      free_bytes = 0x0;
 
     uint64_t reserved_start = (uint64_t) 0x100000 / PAGE_SIZE;
-    uint64_t reserved_end   = ((uint64_t) dat_end + PAGE_SIZE - 1) / PAGE_SIZE;
+    uint64_t reserved_end   = ((uint64_t) dat_ptr + PAGE_SIZE - 1) / PAGE_SIZE;
 
     {
         uint64_t reserve_sz = reserved_end * PAGE_SIZE - reserved_start * PAGE_SIZE;
-        void *args[] = {&reserve_sz};
-        serial_printf("[pmm_init]:\tkernel reserve size: %u\n", args);
+        serial_printf("[pmm_init]:\tkernel reserve size: %u\n", (void*[]){&reserve_sz});
     }
 
     ent_ptr = ent_start;                                                       // [SECTION 3.0 -> 1]
@@ -377,7 +375,8 @@ uint64_t pmm_alloc_locked(uint64_t order) {
     if (free_list[found_order]) free_list[found_order]->prev = NULL;
 
     // mark bit as occupied
-    uint64_t block_idx = ((uint64_t) addr / PAGE_SIZE) >> found_order;
+    uint64_t addr_phys = DIRECT_VIRT_TO_PHYS(addr);
+    uint64_t block_idx = ((uint64_t) addr_phys / PAGE_SIZE) >> found_order;
     order_bm[found_order][block_idx / 8] |= (uint8_t)(1ULL << (block_idx % 8));
 
     // allocate new blocks for each order >= order
@@ -385,11 +384,11 @@ uint64_t pmm_alloc_locked(uint64_t order) {
         --found_order;
 
         // set buddy to free
-        uint64_t buddy = ((uint64_t) addr / PAGE_SIZE) + (1ULL << found_order);
+        uint64_t buddy = ((uint64_t) addr_phys / PAGE_SIZE) + (1ULL << found_order);
         buddy_alloc(buddy, found_order);
 
         // mark block to alloc from as used
-        block_idx = ((uint64_t) addr / PAGE_SIZE) >> found_order;
+        block_idx = ((uint64_t) addr_phys / PAGE_SIZE) >> found_order;
         order_bm[found_order][block_idx / 8] |= (1ULL << (block_idx % 8));
     }
 
@@ -398,10 +397,14 @@ uint64_t pmm_alloc_locked(uint64_t order) {
 
 uint64_t pmm_alloc(uint64_t order) {
     if (order > MAX_ORDER) return 0x0;
+
     uint64_t f = irq_save();
-    uint64_t p = pmm_alloc_locked(order);
+    uint64_t addr = pmm_alloc_locked(order);
     irq_restore(f);
-    return p;
+
+    if (!addr) return 0;
+    
+    return DIRECT_VIRT_TO_PHYS(addr);
 }
 
 void pmm_free_locked(uint64_t addr, uint64_t order) {
@@ -429,7 +432,7 @@ void pmm_free_locked(uint64_t addr, uint64_t order) {
         if (order_bm[order][buddy / 8] & mask) break;                          // dont coalesce if buddy isnt free
 
         buddy_page = buddy << order;
-        node = (struct free_block *) (buddy_page * PAGE_SIZE);
+        node = PHYS_TO_VIRT(buddy_page * PAGE_SIZE);
 
         if (node->prev) node->prev->next = node->next;                         // case not the head
         else            free_list[order] = node->next;                         // case node is the head
@@ -476,7 +479,7 @@ uint64_t pmm_check() {
         for (struct free_block *c = free_list[ord]; c; c = c->next) {
             if (++n > total_blocks) { errors++; break; }                 // cycle
             if (c->prev != prev) errors++;                                // back-link mismatch
-            uint64_t frame = (uint64_t)c / PAGE_SIZE;
+            uint64_t frame = DIRECT_VIRT_TO_PHYS(c) / PAGE_SIZE;
             if (frame % (1ULL << ord)) errors++;                          // misaligned for its order
             uint64_t idx = frame >> ord;
             if (order_bm[ord][idx / 8] & (1 << (idx % 8))) errors++;      // on free list but marked used
@@ -490,7 +493,7 @@ uint64_t pmm_check() {
 void pmm_test() {
     uint64_t total_alloc  = 0x0;
     uint64_t phys_list    = pmm_alloc(9);
-    uint64_t *p_free_list = (uint64_t *)phys_list;
+    uint64_t *p_free_list = PHYS_TO_VIRT(phys_list);
     uint64_t i = 0;
     
     for (; (p_free_list[i] = pmm_alloc(0)) != 0x0; i++) {

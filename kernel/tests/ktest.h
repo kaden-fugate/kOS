@@ -1,7 +1,9 @@
 #ifndef KTEST_H
 #define KTEST_H
 
-void ktest();
+#include <stdint.h>
+
+void ktest(void (*p)(uint32_t, uint32_t));
 void pre_emption_test();
 
 #endif
