@@ -35,6 +35,8 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
     asm volatile("sti");
 
     pre_emption_test();
+    asm volatile("int $0x80");
+    serial_print("[syscall_test] retruned to ring 0\n");
 
     for (;;) asm volatile("hlt");
 }

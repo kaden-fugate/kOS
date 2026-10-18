@@ -47,6 +47,11 @@ extern void isr30(void);
 extern void isr31(void);
 
 extern void isr32(void);
+extern void isr128(void);
+
+static int from_user(struct interrupt_frame *frame) {
+    return (frame->cs & 3) == 3;
+}
 
 static void idt_set_entry(int vector, void (*handler)(void), uint8_t type_attr) {
     uint64_t addr = (uint64_t)handler;
@@ -109,6 +114,7 @@ void idt_init(void) {
     idt_set_entry(31, isr31, flags);
 
     idt_set_entry(PIT_IRQ_VEC, isr32, flags);
+    idt_set_entry(0x80, isr128, 0xEE); // P=1, DPL=3, type=E
 
     // ** remaining 224 entries are zero'd out **
 
@@ -160,28 +166,38 @@ void idt_common_handler(struct interrupt_frame *frame) {
 
     if (frame->vector == 0x20) {
         pit_ticks++;
-
         pic_send_eoi(0);
-
-        // if ((pit_ticks % 2) == 0) 
         schedule();
-
         return;
     }
-    
-    // 14: page fault
-    if (frame->vector == 14) {
-        // faulting addr is not on stack with a page fault, put it in cr2
-        // instead
-        uint64_t fault_addr;
-        asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
-
-        serial_printf("PAGE FAULT (%x)\n", (void*[]){&fault_addr});
-    } 
+    else if (frame->vector == 0x80) {
+        serial_print("[syscall] entered\n");
+        return;
+    }
     else if (frame->vector < 32) {
-        serial_print("EXCEPTION: ");
-        serial_print(exception_names[frame->vector]);
-        serial_print("\n");
+        uint64_t vector = frame->vector;
+        uint64_t rip    = frame->rip;
+        uint64_t cs     = frame->cs;
+        uint64_t error  = frame->error_code;
+        serial_printf("[fault] vector=%x %s rip=%x cs=%x error=%x\n", 
+            (void*[]){
+                &vector, (void*)exception_names[frame->vector], &rip, &cs, &error
+            }
+        );
+
+        // 14: page fault
+        if (frame->vector == 14) {
+            // faulting addr is not on stack with a page fault, put it in cr2
+            // instead
+            uint64_t fault_addr;
+            asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
+
+            serial_printf("PAGE FAULT (%x)\n", (void*[]){&fault_addr});
+        } 
+        else if (from_user(frame)) {
+            serial_print("[fault] user task killed\n");
+            task_exit(); // noreturn
+        }
     } 
     else {
         serial_print("Unhandled interrupt\n");

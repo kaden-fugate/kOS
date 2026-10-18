@@ -58,6 +58,7 @@ ISR_NOERR 30
 ISR_NOERR 31
 
 ISR_NOERR 32
+ISR_NOERR 128
 
 ; every stub will jump here
 isr_common_stub:
