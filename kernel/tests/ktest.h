@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-void ktest(void (*p)(uint32_t, uint32_t));
+void ktest_pre_mt(void (*p)(uint32_t, uint32_t));
 void pre_emption_test();
+void ktest_post_mt();
 
 #endif

@@ -6,6 +6,7 @@
 #include "kernel/task.h"
 #include "mm/pmm.h"
 #include "mm/def.h"
+#include "tss_test.h"
 
 #define PS_ITERS   0xFFFFF
 #define PS_HELD    12
@@ -113,10 +114,11 @@ static void pmm_stress(uint64_t id) {
 
 }
 
-void pmm_stress_a() { asm volatile("sti"); pmm_stress(0x10); }
-void pmm_stress_b() { asm volatile("sti"); pmm_stress(0x80); }
+void pmm_stress_a() { asm volatile("sti"); tss_test(current); pmm_stress(0x10); }
+void pmm_stress_b() { asm volatile("sti"); tss_test(current); pmm_stress(0x80); }
 
 void run_pmm_test() {
+    serial_print("[pmm_stress]: start\n");
     struct task *pmm_test_a = task_create(pmm_stress_a);
     struct task *pmm_test_b = task_create(pmm_stress_b);
 
@@ -129,10 +131,10 @@ void run_pmm_test() {
 
     uint64_t after = pmm_free_bytes();
     uint64_t errs = pmm_check();
-    serial_printf("[run_pmm_test]: free before=[%u] after=[%u] errors=%u\n", 
+    serial_printf("[pmm_stress]: free before=[%u] after=[%u] errors=%u\n", 
         (void*[]){&before, &after, &errs});
     serial_print(before == after && !errs && !ps_failed 
-        ? "[run_pmm_test]: PASS\n"
-        : "[run_pmm_test]: FAIL\n"
+        ? "[pmm_stress]: PASS\n"
+        : "[pmm_stress]: FAIL\n"
     );
 }

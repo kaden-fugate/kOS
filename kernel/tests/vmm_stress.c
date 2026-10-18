@@ -6,6 +6,7 @@
 #include "kernel/task.h"
 #include "kernel/cpu.h"
 #include "drivers/serial.h"
+#include "tss_test.h"
 
 #define VT_ROUNDS 96
 #define VT_PT_BASE   0xFFFFA10000000000ULL
@@ -70,10 +71,11 @@ static void vt_worker(uint64_t id) {
     }
 }
 
-void vt_a() {asm volatile("sti"); vt_worker(0);}
-void vt_b() {asm volatile("sti"); vt_worker(1);}
+void vt_a() {asm volatile("sti"); tss_test(current); vt_worker(0);}
+void vt_b() {asm volatile("sti"); tss_test(current); vt_worker(1);}
 
 void run_vmm_test() {
+    serial_print("[vmm_stress]: start\n");
     struct task *vmm_test_a = task_create(vt_a);
     struct task *vmm_test_b = task_create(vt_b);
     uint64_t before = pmm_free_bytes();

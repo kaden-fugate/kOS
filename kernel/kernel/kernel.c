@@ -7,6 +7,7 @@
 #include "kernel/gdt.h"
 #include "kernel/idt.h"
 #include "kernel/task.h"
+#include "kernel/tss.h"
 
 #include "mm/pmm.h"
 #include "mm/vmm.h"
@@ -21,7 +22,7 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
     pmm_init(info_ptr);
     vmm_init();
     heap_init();
-    ktest(kernel_main);
+    ktest_pre_mt(kernel_main);
 
     asm volatile("cli");
     pic_remap();
@@ -30,6 +31,7 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
     pic_set_mask(0xFFFE);
     
     task_init();
+    tss_init(boot_task.kstack_top);
     asm volatile("sti");
 
     pre_emption_test();

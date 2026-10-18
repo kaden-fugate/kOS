@@ -12,10 +12,11 @@ extern struct task *task_b;
 enum task_state { TASK_READY, TASK_RUNNING, TASK_DEAD };
 
 struct task {
-    uint64_t                 rsp;       // saved stack ptr
-    uint8_t                 *stk_base;  // base of the stack
-    struct task             *next;      // next task to run
-    volatile enum task_state state;     // task state
+    uint64_t                 rsp;        // saved stack ptr
+    uint8_t                 *stk_base;   // base of the stack
+    uint64_t                 kstack_top; // top of this tasks kernel stack
+    struct task             *next;       // next task to run
+    volatile enum task_state state;      // task state
 };
 
 struct task *task_create(void (*)(void));

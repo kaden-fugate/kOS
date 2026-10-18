@@ -13,13 +13,16 @@
 #include "heap_stress.h"
 #include "pmm_stress.h"
 #include "vmm_stress.h"
+#include "tss_test.h"
 
 uint8_t stall() {
     while( !(current == &boot_task && current->next == &boot_task) ) 
-        asm volatile("hlt");
+        asm volatile("sti; hlt");
+    
+    return 0;
 }
 
-void ktest(void (*p)(uint32_t, uint32_t)) {
+void ktest_pre_mt(void (*p)(uint32_t, uint32_t)) {
     serial_print("Welcome to kOS.\n");
 
     uint64_t rip;

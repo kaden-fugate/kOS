@@ -1,14 +1,15 @@
 #include "task.h"
-
+#include "cpu.h"
+#include "tss.h"
 #include "drivers/serial.h"
 #include "mm/heap.h"
-#include "cpu.h"
 
 struct task boot_task;
 struct task *current;
 struct task *task_b;
 
 extern void switch_context(uint64_t*, uint64_t);
+extern uint8_t kernel_stack_top[];
 
 struct task *task_create(void (*entry)(void)) {
     struct task *t = kmalloc(sizeof(struct task));
@@ -17,8 +18,9 @@ struct task *task_create(void (*entry)(void)) {
     t->stk_base    = kmalloc(TASK_STACK_SIZE);
     if (!t->stk_base) { kfree(t); return NULL; }
 
-    uint64_t top = (uint64_t)(t->stk_base + TASK_STACK_SIZE) & ~0xFULL;
-    uint64_t *sp = (uint64_t*)top;
+    uint64_t top  = (uint64_t)(t->stk_base + TASK_STACK_SIZE) & ~0xFULL;
+    t->kstack_top = top;
+    uint64_t *sp  = (uint64_t*)top;
 
     *(--sp) = (uint64_t)task_exit;  // function to execute on task completion
     *(--sp) = (uint64_t)entry;      // entry point of the new task
@@ -39,19 +41,22 @@ struct task *task_create(void (*entry)(void)) {
 void schedule() {
     struct task *prev = current;
     struct task *next = prev->next;
-    if (next == prev) return;
+    if (!next || next == prev) return;
 
     current = next;
+    tss_set_rsp0(next->kstack_top);
     switch_context(&prev->rsp, next->rsp);
 }
 
 void task_init() {
     boot_task.next     = &boot_task;
     boot_task.state    = TASK_RUNNING;
+    boot_task.kstack_top = (uint64_t)kernel_stack_top;
     boot_task.stk_base = NULL;
     boot_task.rsp      = 0;
 
     current = &boot_task;
+    serial_printf("boot kstack_top=%x\n", (void*[]){&boot_task.kstack_top});
 }
 
 void task_add(struct task *t) {
@@ -61,20 +66,31 @@ void task_add(struct task *t) {
     irq_restore(f);
 }
 
-static void task_remove(struct task *t) {
-    if (t == &boot_task) return;
-    uint64_t f = irq_save();
-    struct task *p = t;
-    while (p->next != t) p = p->next;
-    p->next = t->next;
-    irq_restore(f);
+static struct task *task_remove(struct task *t) {
+    struct task *prev = t;
+    while (prev->next != t) prev = prev->next;
+
+    struct task *next = t->next;
+    prev->next = next;
+    t->next = NULL;
+
+    return next;
 }
 
+__attribute__((noreturn))
 void task_exit() {
     irq_save();
-    current->state = TASK_DEAD;
-    task_remove(current);
-    schedule();
+
+    struct task *dead = current;
+    struct task *next = task_remove(dead);
+
+    dead->state = TASK_DEAD;
+    current = next;
+
+    tss_set_rsp0(next->kstack_top);
+    switch_context(&dead->rsp, next->rsp);
+
+    for (;;) asm volatile("cli; hlt");
 }
 
 void task_join(struct task *t) {
