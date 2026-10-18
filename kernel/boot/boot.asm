@@ -15,6 +15,15 @@
 %define PAGE_HUGE     0x080
 %define PAGE_2M_FLAGS (PAGE_PRESENT | PAGE_WRITABLE | PAGE_HUGE)
 
+global kernel_stack_top
+global kernel_stack_bottom
+
+section .bss
+alignb 16
+kernel_stack_bottom:
+    resb 16384
+kernel_stack_top:
+
 section .multiboot_header
 header_start:
     dd 0xe85250d6                ; multiboot2 magic number
@@ -27,7 +36,7 @@ header_start:
     dd 8
 header_end:
 
-section .boot.bss nobits
+section .boot.bss nobits alloc wrtie align=4096
 align 4096
 
 p4_table: resb 4096
@@ -45,7 +54,7 @@ align 4
 magic:    resd 1
 info_ptr: resd 1
 
-section .boot.text
+section .boot.text exec
 bits 32
 global _start
 _start:
@@ -141,14 +150,11 @@ gdt64:
     dw $ - gdt64 - 1
     dq gdt64
 
-section .boot.text
+section .boot.text exec
 bits 64
 extern kernel_main
 long_mode_start:
-    mov rax, PHYS_MAP_BASE
-    mov rdx, stack_top
-    add rax, rdx
-    mov rsp, rax
+    mov rsp, kernel_stack_top
 
     xor eax, eax
     mov ss, ax

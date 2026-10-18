@@ -7,7 +7,7 @@
 |   1. NULL, 2. kernel code, 3. kernel data, 4. user code, 5. user data       |
 |                                                                             |
 \* ------------------------------------------------------------------------- */
-#define GDT_ENTRIES 5
+#define GDT_ENTRIES 7
 
 struct gdt_entry gdt[GDT_ENTRIES];                                             // actual gdt
 struct gdt_ptr gdtp;                                                           // what we give to lgdt
@@ -138,4 +138,21 @@ void gdt_init(void) {
 
     // reload segments now that we have gdt initialized and loaded
     gdt_reload_segments();
+}
+
+void gdt_set_tss(uint64_t base, uint32_t limit) {
+    struct tss_desc {
+        uint16_t limit_low, base_low;
+        uint8_t  base_mid, access, gran, base_high;
+        uint32_t base_upper, reserved;
+    } __attribute((packed)) *d = (void*)&gdt[5];
+
+    d->limit_low  = limit & 0xFFFF;
+    d->base_low   = base & 0xFFFF;
+    d->base_mid   = (base >> 16) & 0xFF;
+    d->access     = 0x89;
+    d->gran       = (limit >> 16) & 0x0F;
+    d->base_high  = (base >> 24) & 0xFF;
+    d->base_upper = base >> 32;
+    d->reserved   = 0;
 }
