@@ -61,7 +61,7 @@ static void stamp_block(struct held *h) {
 static int stamp_ok(struct held *h) {
     for (uint64_t i = 0; i < (1ULL << h->order); i++) {
         uint64_t phys = h->addr + i * PAGE_SIZE;
-        if (*(volatile uint64_t *)(phys) != h->stamp) return 0;
+        if (*(volatile uint64_t *)PHYS_TO_VIRT(phys) != h->stamp) return 0;
     }
     return 1;
 }
