@@ -38,5 +38,7 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
     asm volatile("int $0x80");
     serial_print("[syscall_test] retruned to ring 0\n");
 
+    ktest_post_mt();
+
     for (;;) asm volatile("hlt");
 }

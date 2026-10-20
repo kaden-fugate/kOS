@@ -14,6 +14,7 @@
 #include "pmm_stress.h"
 #include "vmm_stress.h"
 #include "tss_test.h"
+#include "user_mode_test.h"
 
 uint8_t stall() {
     while( !(current == &boot_task && current->next == &boot_task) ) 
@@ -55,4 +56,8 @@ void pre_emption_test() {
     stall();
 
     serial_print("[pre_emption_test]: done.\n");
+}
+
+void ktest_post_mt() {
+    run_user_mode_test();
 }

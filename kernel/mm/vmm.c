@@ -7,21 +7,25 @@
 uint64_t *k_pml4 = NULL;
 
 void vmm_init() {
-    k_pml4[0] = 0;
-
     uint64_t cr3;
     asm volatile("mov %%cr3, %0" : "=r"(cr3));
-    asm volatile("mov %0, %%cr3" : : "r"(cr3) : "memory");
 
     k_pml4 = PHYS_TO_VIRT(cr3 & PTE_ADDR_MASK);
+    k_pml4[0] = 0;
+    
+    asm volatile("mov %0, %%cr3" : : "r"(cr3) : "memory");
     serial_printf("[vmm_init] k_pml4 at: %x\n", (void*[]){&k_pml4});
 }
 
-static uint64_t *get_or_create_table(uint64_t *parent_ent) {
+static uint64_t *get_or_create_table(uint64_t *parent_ent, uint64_t flags) {
     
     // if existing and is a huge table, return null DO NOT MAP!
     if ((*parent_ent & PTE_PRESENT) && (*parent_ent & PTE_PS)) 
         return NULL;
+    
+    // if page is present and flag has user, set user flag
+    else if ((*parent_ent & PTE_PRESENT) && (flags & PTE_USER))
+        *parent_ent |= PTE_USER;
 
     // if parent entry not present:
     //  allocate physical memory for table (order 0)
@@ -31,7 +35,7 @@ static uint64_t *get_or_create_table(uint64_t *parent_ent) {
         if (!new_table) return NULL;
         
         memset((void*)PHYS_TO_VIRT(new_table), 0, PAGE_SIZE);
-        *parent_ent = new_table | PTE_PRESENT | PTE_WRITEABLE;
+        *parent_ent = new_table | PTE_PRESENT | PTE_WRITEABLE | flags;
     }
 
     // return parent entrys physical address
@@ -42,13 +46,13 @@ static void vmm_map_locked(uint64_t *pml4, uint64_t virt, uint64_t phys,
     uint64_t flags) 
 {
     // get pdpt, pd, pt
-    uint64_t *pdpt = get_or_create_table(&pml4[PML4_IDX(virt)]);
+    uint64_t *pdpt = get_or_create_table(&pml4[PML4_IDX(virt)], flags);
     if (!pdpt) return;
 
-    uint64_t *pd   = get_or_create_table(&pdpt[PDPT_IDX(virt)]);
+    uint64_t *pd   = get_or_create_table(&pdpt[PDPT_IDX(virt)], flags);
     if (!pd) return;
     
-    uint64_t *pt   = get_or_create_table(&pd[PD_IDX(virt)]);
+    uint64_t *pt   = get_or_create_table(&pd[PD_IDX(virt)], flags);
     if (!pt) return;
 
     // map PTE to phys with given flags + present
