@@ -51,7 +51,9 @@ no-qemu: grub
 
 qemu: grub
 	qemu-system-x86_64 -cdrom kos.iso -m 1G \
-		-drive if=pflash,format=raw,readonly=on,file=$(OVMF) -serial stdio
+		-drive if=pflash,format=raw,readonly=on,file=$(OVMF) \
+		-vga std \
+		-serial stdio
 
 clean:
 	rm -rf kos.iso out/* isodir/*

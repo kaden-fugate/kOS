@@ -25,18 +25,30 @@ kernel_stack_bottom:
 kernel_stack_top:
 
 section .multiboot_header
+align 8
 header_start:
     dd 0xe85250d6                ; multiboot2 magic number
     dd 0                         ; architecture: 0 = i386 protected mode
     dd header_end - header_start ; header length
     dd 0x100000000 - (0xe85250d6 + 0 + (header_end - header_start)) ; checksum
+
+    ; request a linear frame buffer, 1024x768, 32 bits/pixel
+    dw 5    ; framebuffer header-tag type
+    dw 0    ; flags: optional
+    dd 20   ; tag size, including this header
+    dd 1024 ; requested width
+    dd 768  ; requested height
+    dd 32   ; bits per pixel
+
+    align 8, db 0
+
     ; required end tag
     dw 0
     dw 0
     dd 8
 header_end:
 
-section .boot.bss nobits alloc wrtie align=4096
+section .boot.bss nobits alloc write align=4096
 align 4096
 
 p4_table: resb 4096
