@@ -3,15 +3,13 @@
 #include <stdint.h>
 #include "mm/pmm.h"
 #include "mm/vmm.h"
-#include "kernel/task.h"
 #include "kernel/cpu.h"
+#include "kernel/layout.h"
+#include "kernel/task.h"
 #include "drivers/serial.h"
 #include "tss_test.h"
 
 #define VT_ROUNDS 96
-#define VT_PT_BASE   0xFFFFA10000000000ULL
-#define VT_PD_BASE   0xFFFFA20000000000ULL
-#define VT_PDPT_BASE 0xFFFFA40000000000ULL
 
 static uint64_t vt_va[2][VT_ROUNDS];
 static uint64_t vt_pa[2][VT_ROUNDS];
@@ -21,9 +19,9 @@ static volatile uint64_t vt_mapped;
 static uint64_t vt_region(uint64_t r) {
     uint64_t idx = r / 3;
     switch (r % 3) {
-        case 0:  return VT_PT_BASE + idx * 0x200000ULL;      // new PT
-        case 1:  return VT_PD_BASE + idx * 0x40000000ULL;    // new PD + PT
-        default: return VT_PDPT_BASE + idx * 0x8000000000ULL;  // new PDPT + PD + PT
+        case 0:  return VMM_TEST_PT_BASE + idx * 0x200000ULL;      // new PT
+        case 1:  return VMM_TEST_PD_BASE + idx * 0x40000000ULL;    // new PD + PT
+        default: return VMM_TEST_PDPT_BASE + idx * 0x8000000000ULL;  // new PDPT + PD + PT
     }
 }
 
