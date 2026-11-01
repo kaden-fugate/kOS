@@ -1,7 +1,7 @@
 #include "console.h"
 #include "framebuffer.h"
 
-static const uint8_t scale = 2;
+static const uint8_t scale = 3;
 
 void console_draw_glpyh(
     uint32_t px,
