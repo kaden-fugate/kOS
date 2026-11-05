@@ -136,20 +136,14 @@ void check_sum(uint64_t reported_free) {
 
         ord_byte = cnt * (1ULL << ord) * PAGE_SIZE;
         free_bytes += ord_byte;
-        {
-            void *args[] = {&ord, &cnt, &ord_byte};
-            serial_printf("[check_sum] ord: %u: %u blocks (%u bytes)\n", args);
-        }
+        serial_printf("[check_sum] ord: %u: %u blocks (%u bytes)\n", ord, cnt, ord_byte);
     }
 
-    {
-        uint64_t diff = reported_free - free_bytes;
-        void *args[] = {&free_bytes, &reported_free, &diff};
-        serial_printf(
-            "\n[check_sum] counted free: %u\n[check_sum] reported free: %u\n[check_sum] diff: %u\n\n", 
-            args
-        );
-    }
+    uint64_t diff = reported_free - free_bytes;
+    serial_printf(
+        "\n[check_sum] counted free: %u\n[check_sum] reported free: %u\n[check_sum] diff: %u\n\n", 
+        free_bytes, reported_free, diff
+    );
 }
 
 void pmm_init(uint32_t info_addr) {
@@ -325,10 +319,8 @@ void pmm_init(uint32_t info_addr) {
     uint64_t reserved_start = (uint64_t) 0x100000 / PAGE_SIZE;
     uint64_t reserved_end   = ((uint64_t) dat_ptr + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    {
-        uint64_t reserve_sz = reserved_end * PAGE_SIZE - reserved_start * PAGE_SIZE;
-        serial_printf("[pmm_init]:\tkernel reserve size: %u\n", (void*[]){&reserve_sz});
-    }
+    serial_printf("[pmm_init]:\tkernel reserve size: %u\n", 
+        reserved_end * PAGE_SIZE - reserved_start * PAGE_SIZE);
 
     ent_ptr = ent_start;                                                       // [SECTION 3.0 -> 1]
     while (ent_ptr < ent_end) {                                                // [SECTION 3.0 -> 2] each entry...
@@ -500,7 +492,7 @@ void pmm_test() {
         total_alloc += PAGE_SIZE;
     }
 
-    serial_printf("[kernel_main] ALL MEM ALLOC'D: %u\n", (void*[]){&total_alloc});
+    serial_printf("[kernel_main] ALL MEM ALLOC'D: %u\n", total_alloc);
 
     uint64_t j = 0;
     for (; j < i; j++) {
@@ -508,5 +500,5 @@ void pmm_test() {
     }
     pmm_free(phys_list, 9);
 
-    serial_printf("[kernel_main] ALL MEM FREED.\n", NULL);
+    serial_print("[kernel_main] ALL MEM FREED.\n");
 }

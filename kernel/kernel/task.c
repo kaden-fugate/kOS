@@ -56,7 +56,7 @@ void task_init() {
     boot_task.rsp      = 0;
 
     current = &boot_task;
-    serial_printf("boot kstack_top=%x\n", (void*[]){&boot_task.kstack_top});
+    serial_printf("boot kstack_top=%x\n", boot_task.kstack_top);
 }
 
 void task_add(struct task *t) {

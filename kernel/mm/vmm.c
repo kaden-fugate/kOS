@@ -14,7 +14,7 @@ void vmm_init() {
     k_pml4[0] = 0;
     
     asm volatile("mov %0, %%cr3" : : "r"(cr3) : "memory");
-    serial_printf("[vmm_init] k_pml4 at: %x\n", (void*[]){&k_pml4});
+    serial_printf("[vmm_init] k_pml4 at: %x\n", k_pml4);
 }
 
 static uint64_t *get_or_create_table(uint64_t *parent_ent, uint64_t flags) {
@@ -155,13 +155,13 @@ void vmm_test() {
     uint64_t result = vmm_translate(PHYS_MAP_BASE + 0x100000);
     serial_printf(
         "[vmm_test] translate(PHYS_MAP_BASE + 0x100000) = %x (expected: 0x100000)\n",
-        (void*[]){&result}
+        result
     );
 
     result = vmm_translate(0xFFFFA00000000000ULL);
     serial_printf(
         "[vmm_test] translate(0xFFFFA00000000000) = %x (expected: NULL)\n",
-        (void*[]){&result}
+        result
     );
 
     // test vmm_map
@@ -175,7 +175,7 @@ void vmm_test() {
         "[vmm_test] phys      = %x\n"
         "[vmm_test] virt      = %x\n"
         "[vmm_test] transated = %x (expected: %x)\n", 
-        (void*[]){&phys, &virt, &trns, &phys}
+        phys, virt, trns, phys
     );
 
     // test mapping worked
@@ -186,7 +186,7 @@ void vmm_test() {
     uint64_t *phys_ptr = PHYS_TO_VIRT(phys);
     serial_printf(
         "[vmm_test] read physical mem = %x (expected: 0xCAFEBABE)\n",
-        (void*[]){phys_ptr}
+        phys_ptr
     );
 
     // test unmap virt mem
@@ -194,8 +194,8 @@ void vmm_test() {
     trns = vmm_translate(virt);
     
     serial_printf(
-        "[vmm_test] transated = %x (expected: NULL)\n", 
-        (void*[]){&trns}
+        "[vmm_test] translated = %x (expected: NULL)\n", 
+        trns
     );
 
     // uncomment to test permissions

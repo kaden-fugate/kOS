@@ -69,8 +69,7 @@ static int stamp_ok(struct held *h) {
 // if we failed, log error, halt fo-eva
 static void fail(const char *what, uint64_t id, uint64_t addr, uint64_t order) {
     ps_failed = 1;
-    serial_printf("[pmm_stress %x]: %s addr=[%x] order=[%u]\n", 
-        (void*[]){&id, (void*)what, &addr, &order});
+    serial_printf("[pmm_stress %x]: %s addr=[%x] order=[%u]\n", id, what, addr, order);
     for (;;) asm volatile("hlt");
 }
 
@@ -132,7 +131,7 @@ void run_pmm_test() {
     uint64_t after = pmm_free_bytes();
     uint64_t errs = pmm_check();
     serial_printf("[pmm_stress]: free before=[%u] after=[%u] errors=%u\n", 
-        (void*[]){&before, &after, &errs});
+        before, after, errs);
     serial_print(before == after && !errs && !ps_failed 
         ? "[pmm_stress]: PASS\n"
         : "[pmm_stress]: FAIL\n"

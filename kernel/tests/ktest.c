@@ -32,9 +32,9 @@ void ktest_pre_mt(void (*p)(uint32_t, uint32_t)) {
     uint64_t rsp;
     asm volatile("mov %%rsp, %0" : "=r"(rsp));
 
-    serial_printf("[higher-half] kernel_main= %x \n", (void*[]){&p});
-    serial_printf("[higher-half] RIP= %x \n", (void*[]){&rip});
-    serial_printf("[higher-half] RSP= %x \n", (void*[]){&rsp});
+    serial_printf("[higher-half] kernel_main= %x \n", p);
+    serial_printf("[higher-half] RIP= %x \n", rip);
+    serial_printf("[higher-half] RSP= %x \n", rsp);
     
     // test idt is working (keep uncommented if you dont want things to break)
     // int x = 1 / 0;
