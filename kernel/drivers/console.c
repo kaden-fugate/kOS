@@ -1,6 +1,7 @@
 #include "console.h"
 #include "framebuffer.h"
 #include "serial.h"
+#include "kernel/cpu.h"
 
 static uint8_t  scale = 3;
 static uint32_t glyph_height;
@@ -85,7 +86,7 @@ void console_init(uint32_t bg) {
     fb_clear(bg);
 }
 
-void console_putc(const char c) {
+static void console_putc(const char c) {
     uint64_t row = cursor_row;
     uint64_t col = cursor_col;
     uint64_t height = console_height;
@@ -109,9 +110,11 @@ void console_putc(const char c) {
 
 void console_print(const char *s) {
     if (!s) return;
+    uint64_t f = irq_save();
 
-    for (int i = 0; s[i] != '\0'; i++)
-        console_putc(s[i]);
+    for (int i = 0; s[i] != '\0'; i++) console_putc(s[i]);
+
+    irq_restore(f);
 }
 
 static void print_uint(uint64_t num, uint8_t base) {
@@ -137,11 +140,8 @@ static void print_int(int64_t num) {
     print_uint((uint64_t)num, 10);
 }
 
-void console_printf(const char *frmt, ...) {
+static void console_printf_locked(const char *frmt, va_list args) {
     if (!frmt) return;
-
-    va_list args;
-    va_start(args, frmt);
 
     for (int i = 0; frmt[i] != '\0'; i++) {
         if (frmt[i] != '%') {
@@ -183,4 +183,23 @@ void console_printf(const char *frmt, ...) {
     }
 
     va_end(args);
+}
+
+void console_printf(const char *frmt, ...) {
+    uint64_t f = irq_save();
+
+    va_list args;
+    va_start(args, frmt);
+    console_printf_locked(frmt, args);
+    va_end(args);
+
+    irq_restore(f);
+}
+
+void console_write(const char *frmt, uint16_t n) {
+    uint64_t f = irq_save();
+
+    for (uint16_t i = 0; i < n; i++) console_putc(frmt[i]);
+
+    irq_restore(f);
 }
