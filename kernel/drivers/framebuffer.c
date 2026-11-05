@@ -34,18 +34,6 @@ static uint64_t align_up(uint64_t val, uint64_t n) {
     return (val + (n - 1)) & ~(n - 1);
 }
 
-static const struct framebuffer *framebuffer_get() {
-    return &fb;
-}
-
-static const uint32_t framebuffer_width() {
-    return fb.width;
-}
-
-static const uint32_t framebuffer_height() {
-    return fb.height;
-}
-
 static int framebuffer_discover(uint64_t mb_info_phys) {
     uint8_t *info = (uint8_t *)PHYS_TO_VIRT(mb_info_phys);
     struct mb2_info *header = (struct mb2_info *)info;
@@ -123,4 +111,31 @@ void fb_put_pix(uint32_t x, uint32_t y, uint32_t rgb) {
         fb.virt_addr + (uint64_t)y * fb.pitch + (uint64_t)x * 4
     );
     *pixel = rgb;
+}
+
+void fb_clear(uint32_t rgb) {
+    for (uint32_t y = 0; y < fb.height; y++) // rows
+        for (uint32_t x = 0; x < fb.width; x++) { // cols
+            volatile uint32_t *pixel = (volatile uint32_t *) (
+                fb.virt_addr + (uint64_t)y * fb.pitch + (uint64_t)x * 4
+            );
+            *pixel = rgb;
+        }
+    
+}
+
+const uint32_t fb_width() {
+    return fb.width;
+}
+
+const uint32_t fb_height() {
+    return fb.height;
+}
+
+const uint32_t fb_pitch() {
+    return fb.pitch;
+}
+
+const uint8_t *fb_base() {
+    return fb.virt_addr;
 }

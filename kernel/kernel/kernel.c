@@ -25,33 +25,13 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
     vmm_init();
     heap_init();
     framebuffer_init(info_ptr);
-
-    console_draw_glpyh(0* 8 * 3, 2, font8x16['a'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(1* 8 * 3, 2, font8x16['b'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(2* 8 * 3, 2, font8x16['c'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(3* 8 * 3, 2, font8x16['d'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(4* 8 * 3, 2, font8x16['e'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(5* 8 * 3, 2, font8x16['f'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(6* 8 * 3, 2, font8x16['g'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(7* 8 * 3, 2, font8x16['h'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(8* 8 * 3, 2, font8x16['i'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(9* 8 * 3, 2, font8x16['j'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(10* 8 * 3, 2, font8x16['k'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(11* 8 * 3, 2, font8x16['l'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(12* 8 * 3, 2, font8x16['m'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(13* 8 * 3, 2, font8x16['n'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(14* 8 * 3, 2, font8x16['o'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(15* 8 * 3, 2, font8x16['p'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(16* 8 * 3, 2, font8x16['q'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(17* 8 * 3, 2, font8x16['r'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(18* 8 * 3, 2, font8x16['s'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(19* 8 * 3, 2, font8x16['t'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(20* 8 * 3, 2, font8x16['u'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(21* 8 * 3, 2, font8x16['v'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(22* 8 * 3, 2, font8x16['w'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(23* 8 * 3, 2, font8x16['x'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(24* 8 * 3, 2, font8x16['y'], FB_COLOR_WHITE, FB_COLOR_BLACK);
-    console_draw_glpyh(25* 8 * 3, 2, font8x16['z'], FB_COLOR_WHITE, FB_COLOR_BLACK);
+    console_init(FB_COLOR_BLACK);
+    char c = '!';
+    int num_d = -67;
+    uint64_t num_u = 1234567890;
+    uint64_t num_x = 0xDEADBEEF;
+    int num_o = 64;
+    console_printf("%s is a test msg%c %d %u %x %o", "This", c, num_d, num_u, num_x, num_o);
 
     ktest_pre_mt(kernel_main);
 

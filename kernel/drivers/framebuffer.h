@@ -25,6 +25,13 @@ struct framebuffer {
 };
 
 int framebuffer_init(uint64_t);
+
 void fb_put_pix(uint32_t, uint32_t, uint32_t);
+void fb_clear(uint32_t);
+
+const uint32_t fb_width();
+const uint32_t fb_height();
+const uint32_t fb_pitch();
+uint8_t* fb_base();
 
 #endif
