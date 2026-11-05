@@ -1,8 +1,13 @@
 #ifndef DRIVERS_H
 #define DRIVERS_H
 
+#include "def.h"
+#include <stdarg.h>
+
+#define COM1 0x3F8
+
 void serial_init(void);
-void serial_putc(char c);
-void serial_print(const char *s);
+void serial_print(const char *);
+void serial_printf(const char *, ...);
 
 #endif

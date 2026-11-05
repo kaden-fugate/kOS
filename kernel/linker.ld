@@ -1,31 +1,34 @@
 ENTRY(_start)
+
+KERNEL_VMA = 0xFFFFFFFF80000000;
+
 SECTIONS
 {
+    /* low phys + low virt bootstap code */
     . = 1M;
-
-    .boot :
-    {
-        *(.multiboot_header)
+    .boot : {
+        KEEP(*(.multiboot_header))
+        *(.boot.text)
+        *(.boot.rodata)
+        *(.boot.data)
+        *(.boot.bss)
     }
 
-    .text :
-    {
+    . = KERNEL_VMA + .;
+    .text : AT(ADDR(.text) - KERNEL_VMA) {
         *(.text)
     }
-
-    .rodata :
-    {
+    .rodata : AT(ADDR(.rodata) - KERNEL_VMA) {
         *(.rodata)
     }
-
-    .data :
-    {
+    .data : AT(ADDR(.data) - KERNEL_VMA) {
         *(.data)
     }
-
-    .bss :
-    {
+    .bss : AT(ADDR(.bss) - KERNEL_VMA) {
         *(COMMON)
         *(.bss)
     }
+
+    kernel_end = .;
+    kernel_phys_end = kernel_end - KERNEL_VMA;
 }

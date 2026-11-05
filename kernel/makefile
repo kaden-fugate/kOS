@@ -1,15 +1,16 @@
 CC = x86_64-elf-gcc
 LD = x86_64-elf-ld
 
-CFLAGS = -m64 -ffreestanding -fno-stack-protector -fno-pic -mno-red-zone -I.
+CFLAGS = -m64 -ffreestanding -fno-stack-protector -fno-pic -fno-pie \
+		 	-mno-red-zone -mcmodel=kernel -I.
 LDFLAGS = -n -T linker.ld
 
 OVMF = /opt/homebrew/Cellar/qemu/11.0.3/share/qemu/edk2-x86_64-code.fd
 
-SRC_C = $(wildcard kernel/*.c drivers/*.c)
+SRC_C = $(wildcard kernel/*.c drivers/*.c mm/*.c kutil/*.c tests/*.c)
 OBJ_C = $(patsubst %.c, out/%.o, $(notdir $(SRC_C)))
 
-VPATH = kernel:drivers
+VPATH = kernel:drivers:mm:kutil:tests
 
 .PHONY: all boot kernel grub no-qemu qemu clean
 
@@ -23,27 +24,37 @@ out/isr.o: boot/isr.asm
 	@mkdir -p out
 	nasm -f elf64 $< -o $@
 
+out/switch.o: kernel/switch.asm
+	@mkdir -p out
+	nasm -f elf64 $< -o $@
+
+out/enter_user.o: kernel/enter_user.asm
+	@mkdir -p out
+	nasm -f elf64 $< -o $@
+
 out/%.o: %.c
 	@mkdir -p out
 	$(CC) $(CFLAGS) -c $< -o $@
 
-out/kernel.bin: out/boot.o out/isr.o $(OBJ_C)
+out/kernel.bin: out/boot.o out/isr.o out/switch.o out/enter_user.o $(OBJ_C)
 	$(LD) $(LDFLAGS) -o $@ $^
 
-multix.iso: out/kernel.bin
+kos.iso: out/kernel.bin
 	mkdir -p isodir/boot/grub
 	cp out/kernel.bin isodir/boot/kernel.bin
 	cp grub/grub.cfg isodir/boot/grub/grub.cfg
-	x86_64-elf-grub-mkrescue -o multix.iso isodir/
+	x86_64-elf-grub-mkrescue -o kos.iso isodir/
 
-grub: multix.iso
+grub: kos.iso
 
 no-qemu: grub
 
 qemu: grub
-	qemu-system-x86_64 -cdrom multix.iso -m 1G \
-		-drive if=pflash,format=raw,readonly=on,file=$(OVMF) -serial stdio
+	qemu-system-x86_64 -cdrom kos.iso -m 1G \
+		-drive if=pflash,format=raw,readonly=on,file=$(OVMF) \
+		-vga std \
+		-serial stdio
 
 clean:
-	rm -rf multix.iso out/* isodir/*
+	rm -rf kos.iso out/* isodir/*
 	clear

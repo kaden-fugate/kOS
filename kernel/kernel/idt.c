@@ -1,10 +1,16 @@
 #include "kernel/idt.h"
 #include "drivers/serial.h"
+#include "drivers/pic.h"
+#include "kernel/task.h"
 
 // 256 possible vectors, 32 cpu-defined exceptions.
 #define IDT_ENTRIES 256
+#define PIT_IRQ_VEC 0x20
+
 struct idt_entry idt[IDT_ENTRIES];  // the table itself
 struct idt_ptr idtp;                 // what we hand to `lidt`
+
+static volatile uint64_t pit_ticks = 0;
 
 // declare the 32 labels defined in isr.asm.
 extern void isr0(void);
@@ -39,6 +45,13 @@ extern void isr28(void);
 extern void isr29(void);
 extern void isr30(void);
 extern void isr31(void);
+
+extern void isr32(void);
+extern void isr128(void);
+
+static int from_user(struct interrupt_frame *frame) {
+    return (frame->cs & 3) == 3;
+}
 
 static void idt_set_entry(int vector, void (*handler)(void), uint8_t type_attr) {
     uint64_t addr = (uint64_t)handler;
@@ -100,6 +113,9 @@ void idt_init(void) {
     idt_set_entry(30, isr30, flags);
     idt_set_entry(31, isr31, flags);
 
+    idt_set_entry(PIT_IRQ_VEC, isr32, flags);
+    idt_set_entry(0x80, isr128, 0xEE); // P=1, DPL=3, type=E
+
     // ** remaining 224 entries are zero'd out **
 
     // populate idt ptr to be loaded using lidt
@@ -112,34 +128,79 @@ void idt_init(void) {
 
 // self explanatory... right?
 static const char *exception_names[32] = {
-    "Divide by zero", "Debug", "NMI", "Breakpoint", "Overflow", 
-    "Bound range exceeded", "Invalid opcode", "Device not available", 
-    "Double fault", "Coprocessor segment overrun", "Invalid TSS", 
-    "Segment not present", "Stack-segment fault", "General protection fault", 
-    "Page fault", "Reserved", "x87 floating point exception", 
-    "Alignment check", "Machine check", "SIMD floating point exception",
-    "Virtualization exception", "Control protection exception", "Reserved", 
-    "Reserved", "Reserved", "Reserved", "Reserved", "Reserved",
-    "Hypervisor injection exception", "VMM communication exception", 
-    "Security exception", "Reserved"
+    "Divide by zero", 
+    "Debug", 
+    "NMI", 
+    "Breakpoint", 
+    "Overflow", 
+    "Bound range exceeded", 
+    "Invalid opcode", 
+    "Device not available", 
+    "Double fault", 
+    "Coprocessor segment overrun", 
+    "Invalid TSS", 
+    "Segment not present", 
+    "Stack-segment fault", 
+    "General protection fault", 
+    "Page fault", 
+    "Reserved", 
+    "x87 floating point exception", 
+    "Alignment check", 
+    "Machine check", 
+    "SIMD floating point exception",
+    "Virtualization exception", 
+    "Control protection exception", 
+    "Reserved", 
+    "Reserved", 
+    "Reserved", 
+    "Reserved", 
+    "Reserved", 
+    "Reserved",
+    "Hypervisor injection exception", 
+    "VMM communication exception", 
+    "Security exception", 
+    "Reserved"
 };
-
 
 void idt_common_handler(struct interrupt_frame *frame) {
 
-    // 14: page fault
-    if (frame->vector == 14) {
-        // faulting addr is not on stack with a page fault, put it in cr2
-        // instead
-        uint64_t fault_addr;
-        asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
-
-        serial_print("PAGE FAULT\n");
-    } else {
-        serial_print("EXCEPTION: ");
-        serial_print(exception_names[frame->vector]);
-        serial_print("\n");
+    if (frame->vector == 0x20) {
+        pit_ticks++;
+        pic_send_eoi(0);
+        schedule();
+        return;
     }
+    else if (frame->vector == 0x80) {
+        serial_print("[syscall] entered\n");
+        return;
+    }
+    else if (frame->vector < 32) {
+        uint64_t vector = frame->vector;
+        uint64_t rip    = frame->rip;
+        uint64_t cs     = frame->cs;
+        uint64_t error  = frame->error_code;
+        serial_printf("[fault] vector=%x %s rip=%x cs=%x error=%x\n", 
+            vector, exception_names[frame->vector], rip, cs, error
+        );
+
+        // 14: page fault
+        if (frame->vector == 14) {
+            // faulting addr is not on stack with a page fault, put it in cr2
+            // instead
+            uint64_t fault_addr;
+            asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
+
+            serial_printf("PAGE FAULT (%x)\n", fault_addr);
+        } 
+        else if (from_user(frame)) {
+            serial_print("[fault] user task killed\n");
+            task_exit(); // noreturn
+        }
+    } 
+    else {
+        serial_print("Unhandled interrupt\n");
+    }
+
 
     // just halt forever on these exceptions
     for (;;) {

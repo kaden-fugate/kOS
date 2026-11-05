@@ -1,0 +1,209 @@
+#include "mm/vmm.h"
+#include "mm/pmm.h"
+#include "drivers/serial.h"
+#include "kernel/cpu.h"
+#include "kutil/string.h"
+
+uint64_t *k_pml4 = NULL;
+
+void vmm_init() {
+    uint64_t cr3;
+    asm volatile("mov %%cr3, %0" : "=r"(cr3));
+
+    k_pml4 = PHYS_TO_VIRT(cr3 & PTE_ADDR_MASK);
+    k_pml4[0] = 0;
+    
+    asm volatile("mov %0, %%cr3" : : "r"(cr3) : "memory");
+    serial_printf("[vmm_init] k_pml4 at: %x\n", k_pml4);
+}
+
+static uint64_t *get_or_create_table(uint64_t *parent_ent, uint64_t flags) {
+    
+    // if existing and is a huge table, return null DO NOT MAP!
+    if ((*parent_ent & PTE_PRESENT) && (*parent_ent & PTE_PS)) 
+        return NULL;
+    
+    // if page is present and flag has user, set user flag
+    else if ((*parent_ent & PTE_PRESENT) && (flags & PTE_USER))
+        *parent_ent |= PTE_USER;
+
+    // if parent entry not present:
+    //  allocate physical memory for table (order 0)
+    //  set table to point to physical mem + present flag + writeable + user
+    if (!(*parent_ent & PTE_PRESENT)) {
+        uint64_t new_table = pmm_alloc(0);
+        if (!new_table) return NULL;
+        
+        memset((void*)PHYS_TO_VIRT(new_table), 0, PAGE_SIZE);
+        *parent_ent = new_table | PTE_PRESENT | PTE_WRITEABLE | flags;
+    }
+
+    // return parent entrys physical address
+    return PHYS_TO_VIRT(*parent_ent & PTE_ADDR_MASK);
+}
+
+static void vmm_map_locked(uint64_t *pml4, uint64_t virt, uint64_t phys, 
+    uint64_t flags) 
+{
+    // get pdpt, pd, pt
+    uint64_t *pdpt = get_or_create_table(&pml4[PML4_IDX(virt)], flags);
+    if (!pdpt) return;
+
+    uint64_t *pd   = get_or_create_table(&pdpt[PDPT_IDX(virt)], flags);
+    if (!pd) return;
+    
+    uint64_t *pt   = get_or_create_table(&pd[PD_IDX(virt)], flags);
+    if (!pt) return;
+
+    // map PTE to phys with given flags + present
+    pt[PT_IDX(virt)] = (phys & PTE_ADDR_MASK) | PTE_PRESENT | flags;
+
+    // invalidate the previous TLB cache for this virtual address
+    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+}
+
+void vmm_map(uint64_t *pml4, uint64_t virt, uint64_t phys, uint64_t flags) {
+    uint64_t f = irq_save();
+    vmm_map_locked(pml4, virt, phys, flags);
+    irq_restore(f);
+}
+
+static uint64_t vmm_translate_locked(uint64_t virt) {
+    uint64_t *pdpt = NULL;
+    uint64_t *pd   = NULL;
+    uint64_t *pt   = NULL;
+    uint64_t  base = 0x0;
+
+    // get pml4e (NULL if not present)
+    uint64_t pml4e = k_pml4[PML4_IDX(virt)];
+    if (!(pml4e & PTE_PRESENT)) return 0x0;
+    pdpt = PHYS_TO_VIRT(pml4e & PTE_ADDR_MASK);
+
+    // get pdpte (NULL if not present, huge page if PS flag set)
+    uint64_t pdpte = pdpt[PDPT_IDX(virt)];
+    if (!(pdpte & PTE_PRESENT)) return 0x0;
+    if (pdpte & PTE_PS) { 
+        /* handle huge page case here */ 
+        base = pdpte & 0xFFFFFFC0000000ULL;
+        return base | (virt & 0x3FFFFFFFULL);
+    }
+    pd = PHYS_TO_VIRT(pdpte & PTE_ADDR_MASK);
+
+    // same as above for pde
+    uint64_t pde = pd[PD_IDX(virt)];
+    if (!(pde & PTE_PRESENT)) return 0x0;
+    if (pde & PTE_PS) { 
+        /*handle huge page case here*/
+        base = pde & 0xFFFFFFFFFFE00000ULL;
+        return base | (virt & 0x1FFFFFULL);
+    }
+    pt = PHYS_TO_VIRT(pde & PTE_ADDR_MASK);
+
+    // get pte (NULL if not present)
+    uint64_t pte = pt[PT_IDX(virt)];
+    if (!(pte & PTE_PRESENT)) return 0x0;
+
+    base = pte & PTE_ADDR_MASK;
+    return base | (virt & 0xFFF);
+}
+
+uint64_t vmm_translate(uint64_t virt) {
+    uint64_t f = irq_save();
+    uint64_t v = vmm_translate_locked(virt);
+    irq_restore(f);
+    return v;
+}
+
+static void vmm_unmap_locked(uint64_t *pml4, uint64_t virt) {
+    uint64_t pml4e = pml4[PML4_IDX(virt)];
+    if (!(pml4e & PTE_PRESENT)) return;
+
+    uint64_t *pdpt = PHYS_TO_VIRT(pml4e & PTE_ADDR_MASK);
+    uint64_t pdpte = pdpt[PDPT_IDX(virt)];
+    if (!(pdpte & PTE_PRESENT) || (pdpte & PTE_PS)) return;
+
+    uint64_t *pd = PHYS_TO_VIRT(pdpte & PTE_ADDR_MASK);
+    uint64_t pde = pd[PD_IDX(virt)];
+    if (!(pde & PTE_PRESENT) || (pde & PTE_PS)) return;
+
+    uint64_t *pt = PHYS_TO_VIRT(pde & PTE_ADDR_MASK);
+    pt[PT_IDX(virt)] = 0;
+    asm volatile("invlpg (%0)" : : "r"(virt) : "memory");
+}
+
+void vmm_unmap(uint64_t *pml4, uint64_t virt) {
+    uint64_t f = irq_save();
+    vmm_unmap_locked(pml4, virt);
+    irq_restore(f);
+}
+
+uint64_t vmm_alloc(uint64_t *pml4, uint64_t virt, uint8_t order, uint64_t flags) {
+    uint64_t phys = pmm_alloc(order);
+    if (!phys) return 0x0;
+
+    uint64_t n_pages = 1ULL << order;
+    for (uint64_t i = 0; i < n_pages; i++) {
+        vmm_map(pml4, virt + (i * PAGE_SIZE), phys + (i * PAGE_SIZE), flags);
+    }
+
+    return virt;
+}
+
+void vmm_test() {
+    
+    // test vmm_translate
+    uint64_t result = vmm_translate(PHYS_MAP_BASE + 0x100000);
+    serial_printf(
+        "[vmm_test] translate(PHYS_MAP_BASE + 0x100000) = %x (expected: 0x100000)\n",
+        result
+    );
+
+    result = vmm_translate(0xFFFFA00000000000ULL);
+    serial_printf(
+        "[vmm_test] translate(0xFFFFA00000000000) = %x (expected: NULL)\n",
+        result
+    );
+
+    // test vmm_map
+    uint64_t phys = pmm_alloc(0);
+    uint64_t virt = 0xFFFFA00000000000ULL;
+    
+    vmm_map(k_pml4, virt, phys, PTE_WRITEABLE);
+    uint64_t trns = vmm_translate(virt);
+
+    serial_printf(
+        "[vmm_test] phys      = %x\n"
+        "[vmm_test] virt      = %x\n"
+        "[vmm_test] transated = %x (expected: %x)\n", 
+        phys, virt, trns, phys
+    );
+
+    // test mapping worked
+    uint64_t *test_ptr = (uint64_t *)virt;
+    *test_ptr = 0xCAFEBABE;
+    serial_print("[vmm_test] no crash on write to virtual address? :^)\n");
+
+    uint64_t *phys_ptr = PHYS_TO_VIRT(phys);
+    serial_printf(
+        "[vmm_test] read physical mem = %x (expected: 0xCAFEBABE)\n",
+        phys_ptr
+    );
+
+    // test unmap virt mem
+    vmm_unmap(k_pml4, virt);
+    trns = vmm_translate(virt);
+    
+    serial_printf(
+        "[vmm_test] translated = %x (expected: NULL)\n", 
+        trns
+    );
+
+    // uncomment to test permissions
+    // uint64_t r_phys = pmm_alloc(0);
+    // uint64_t r_virt = 0xCAFEBABE;
+    // vmm_map(k_pml4, r_virt, r_phys, 0);
+
+    // serial_print("[vmm_test] write to read-only memory\n");
+    // *(uint64_t *)r_virt = 0xCAFEBABE;
+    // serial_print("[vmm_test] if we reached this point, permissions enforcement failed.\n");
+}
