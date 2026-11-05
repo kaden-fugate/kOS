@@ -12,7 +12,7 @@ void tss_test(struct task *current) {
     uint64_t actual   = tss_get_rsp0();
 
     serial_printf("[tss_test] TR=%x expected_rsp0=%x actual_rsp0=%x\n", 
-        (void*[]){&tr, &expected, &actual});
+        tr, expected, actual);
 
     if (tr != 0x28 || actual != expected) {
         serial_print("[tss_test] FAIL\n");

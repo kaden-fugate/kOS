@@ -27,7 +27,7 @@ static uint64_t vt_region(uint64_t r) {
 
 static void vt_fail(const char *what, uint64_t id, uint64_t va) {
     vt_failed = 1;
-    serial_printf("[vmm_stress %x]: %s va=[%x]\n", (void*[]){&id, (void*)what, &va});
+    serial_printf("[vmm_stress %x]: %s va=[%x]\n", id, what, va);
     for (;;) asm volatile("hlt");
 }
 
@@ -86,7 +86,7 @@ void run_vmm_test() {
     uint64_t after = pmm_free_bytes();
     uint64_t used = before - after;
     uint64_t errs = pmm_check();
-    serial_printf("[vmm_stress]: frames used by page tables: %u  pmm errors: %u\n",
-                  (void*[]){&used, &errs});
+    serial_printf("[vmm_stress]: frames used by page tables: %u pmm errors: %u\n",
+        used, errs);
     serial_print(!vt_failed && errs == 0 ? "[vmm_stress]: PASS\n" : "[vmm_stress]: FAIL\n");
 }

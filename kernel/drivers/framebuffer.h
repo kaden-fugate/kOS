@@ -32,6 +32,6 @@ void fb_clear(uint32_t);
 const uint32_t fb_width();
 const uint32_t fb_height();
 const uint32_t fb_pitch();
-uint8_t* fb_base();
+volatile uint8_t* fb_base();
 
 #endif

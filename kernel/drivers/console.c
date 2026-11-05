@@ -90,7 +90,7 @@ void console_putc(const char c) {
     uint64_t col = cursor_col;
     uint64_t height = console_height;
     uint64_t width = console_width;
-    serial_printf("%u %u %u %u\n", (void*[]){&row, &col, &height, &width});
+
     if (c == '\n') {
         inc_cursor_row();
         return;
@@ -144,43 +144,43 @@ void console_printf(const char *frmt, ...) {
     va_start(args, frmt);
 
     for (int i = 0; frmt[i] != '\0'; i++) {
-
-        if (frmt[i] == '%') {
-            frmt++;
-
-            switch (frmt[i]) {
-                case 'c':
-                    console_putc((char)va_arg(args, int));
-                    break;
-                case 's':
-                    const char *s = va_arg(args, const char *);
-                    console_print(s);
-                    break;
-                case 'd':
-                    const int32_t d = va_arg(args, const int32_t);
-                    print_int((int64_t)d);
-                    break;
-                case 'u':
-                    const uint64_t u = va_arg(args, const uint64_t);
-                    print_uint(u, 10);
-                    break;
-                case 'x':
-                    console_print("0x");
-                    const uint64_t x = va_arg(args, const uint64_t);
-                    print_uint(x, 16);
-                    break;
-                case 'o':
-                    const uint64_t o = va_arg(args, const uint64_t);
-                    print_uint(o, 8);
-                    break;
-                default:
-                    console_putc('%');
-                    console_putc(frmt[i]);
-            }
+        if (frmt[i] != '%') {
+            console_putc(frmt[i]);
+            continue;
         }
-        else { console_putc(frmt[i]); }
+        frmt++;
+
+        switch (frmt[i]) {
+            case 'c':
+                console_putc((char)va_arg(args, int));
+                break;
+            case 's':
+                const char *s = va_arg(args, const char *);
+                console_print(s);
+                break;
+            case 'd':
+                const int32_t d = va_arg(args, const int32_t);
+                print_int((int64_t)d);
+                break;
+            case 'u':
+                const uint64_t u = va_arg(args, const uint64_t);
+                print_uint(u, 10);
+                break;
+            case 'x':
+                console_print("0x");
+                const uint64_t x = va_arg(args, const uint64_t);
+                print_uint(x, 16);
+                break;
+            case 'o':
+                const uint64_t o = va_arg(args, const uint64_t);
+                print_uint(o, 8);
+                break;
+            default:
+                console_putc('%');
+                console_putc(frmt[i]);
+        }
+
     }
 
-    //va_arg(args, int)
     va_end(args);
 }

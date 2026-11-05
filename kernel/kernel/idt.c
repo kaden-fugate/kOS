@@ -180,9 +180,7 @@ void idt_common_handler(struct interrupt_frame *frame) {
         uint64_t cs     = frame->cs;
         uint64_t error  = frame->error_code;
         serial_printf("[fault] vector=%x %s rip=%x cs=%x error=%x\n", 
-            (void*[]){
-                &vector, (void*)exception_names[frame->vector], &rip, &cs, &error
-            }
+            vector, exception_names[frame->vector], rip, cs, error
         );
 
         // 14: page fault
@@ -192,7 +190,7 @@ void idt_common_handler(struct interrupt_frame *frame) {
             uint64_t fault_addr;
             asm volatile("mov %%cr2, %0" : "=r"(fault_addr));
 
-            serial_printf("PAGE FAULT (%x)\n", (void*[]){&fault_addr});
+            serial_printf("PAGE FAULT (%x)\n", fault_addr);
         } 
         else if (from_user(frame)) {
             serial_print("[fault] user task killed\n");

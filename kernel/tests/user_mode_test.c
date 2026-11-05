@@ -26,7 +26,7 @@ void run_user_mode_test() {
 
     if (code_size > PAGE_SIZE) {
         serial_printf("[user_test] user code is too large [%x]\n", 
-            (void*[]){&code_size});
+            code_size);
         return;
     }
 

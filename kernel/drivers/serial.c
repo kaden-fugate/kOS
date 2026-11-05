@@ -1,7 +1,7 @@
 #include "serial.h"
 #include "kernel/cpu.h"
 
-void serial_init(void) {
+void serial_init() {
     outb(COM1 + 1, 0x00); // disable interrupts
     outb(COM1 + 3, 0x80); // enable DLAB
     outb(COM1 + 0, 0x03); // divisor low byte: 38400 baud
@@ -11,11 +11,11 @@ void serial_init(void) {
     outb(COM1 + 4, 0x0B); // IRQs enabled, RTS/DSR set
 }
 
-int serial_transmit_empty(void) {
+int serial_transmit_empty() {
     return inb(COM1 + 5) & 0x20;
 }
 
-void serial_putc(char c) {
+void serial_putc(const char c) {
     while (!serial_transmit_empty());
     outb(COM1, c);
 }
@@ -26,34 +26,30 @@ void serial_print(const char *s) {
     irq_restore(f);
 }
 
-void serial_print_uint(uint64_t val, int base) {
-    if (!val) {
-        serial_putc('0');
+void serial_print_uint(uint64_t num, int base) {
+    char s[256] = {0};
+    const char chars[16] = "0123456789ABCDEF";
+    uint16_t i = 0;
+
+    while (num > 0) {
+        s[i++] = chars[num % base];
+        num   /= base;
+    }
+
+    while (i > 0) serial_putc(s[--i]);
+}
+
+void serial_print_int(int64_t num) {
+    if (num < 0) {
+        serial_putc('-');
+        serial_print_uint((uint64_t)(-(num + 1)) + 1, 10);
         return;
     }
 
-    char       buf[16] = "";
-    const char chars[] = "0123456789ABCDEF";
-    int i        = 0;
-
-    while (val > 0) {
-        buf[i++] = chars[val % base];
-        val     /= base;
-    }
-
-    while (i > 0) serial_putc(buf[--i]);
+    serial_print_uint(num, 10);
 }
 
-void serial_print_int(int64_t val) {
-    if (val < 0) {
-        serial_putc('-');
-        val = -val;
-    }
-
-    serial_print_uint(val, 10);
-}
-
-static void serial_printf_locked(const char *frmt, void *argv[]) {
+static void serial_printf_locked(const char *frmt, va_list argv) {
     // while we havent reached a NULL terminator
     //  iterate through the format
     //  if we see %, look at the next character:
@@ -65,46 +61,48 @@ static void serial_printf_locked(const char *frmt, void *argv[]) {
     //      if c, char:    (serial putc)
     //      anything else: just print the character
 
-    int cur_arg = 0;
-    int64_t  *i_val;
-    uint64_t *u_val;
-    char     *c_val;
     for (int i = 0; frmt[i]; ++i) {
         if (frmt[i] != '%') { 
             serial_putc(frmt[i]); 
             continue;
         }
-        ++i;
+        frmt++;
         
         // we found a %
         switch (frmt[i]) {
+            case 'c':
+                serial_putc((const char)va_arg(argv, const int));
+                break;
+            case 's':
+                serial_print(va_arg(argv, const char *));
+                break;
             case 'd':
-                i_val = (int64_t *)argv[cur_arg++];
-                serial_print_int(*i_val);
+                serial_print_int(va_arg(argv, const int32_t));
                 break;
             case 'u':
-                u_val = (uint64_t *)argv[cur_arg++];
-                serial_print_uint(*u_val, 10);
+                serial_print_uint(va_arg(argv, const uint64_t), 10);
                 break;
             case 'x':
                 serial_print("0x");
-                u_val = (uint64_t *)argv[cur_arg++];
-                serial_print_uint(*u_val, 16);
+                serial_print_uint(va_arg(argv, const uint64_t), 16);
                 break;
-            case 's':
-                c_val = (char *)argv[cur_arg++];
-                serial_print(c_val);
+            case 'o':
+                serial_print_uint(va_arg(argv, const uint64_t), 8);
                 break;
             default:
                 serial_putc('%');
                 serial_putc(frmt[i]);
-                continue;
         }
     }
 }
 
-void serial_printf(const char *frmt, void *argv[]) {
+void serial_printf(const char *frmt, ...) {
     uint64_t f = irq_save();
+
+    va_list argv;
+    va_start(argv, frmt);
     serial_printf_locked(frmt, argv);
+    va_end(argv);
+
     irq_restore(f);
 }

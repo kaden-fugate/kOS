@@ -9,7 +9,7 @@ void stress_task() {
     asm volatile("sti");
     tss_test(current);
     uint8_t id = (uint8_t)(uint64_t)current;     // differs per task
-    serial_printf("[heap_stress_task]: %x start.\n", (void*[]){&current});
+    serial_printf("[heap_stress_task]: %x start.\n", current);
     for (uint64_t k = 0; k < 0xFFFF; k++) {
         uint8_t *p[8];
         for (int i = 0; i < 8; i++) {
@@ -25,7 +25,7 @@ void stress_task() {
             kfree(p[i]);
         }
     }
-    serial_printf("[heap_stress_task]: %x end.\n", (void*[]){&current});
+    serial_printf("[heap_stress_task]: %x end.\n", current);
 }
 
 void run_heap_test() {

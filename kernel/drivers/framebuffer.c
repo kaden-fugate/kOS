@@ -59,17 +59,14 @@ static int framebuffer_discover(uint64_t mb_info_phys) {
             fb.bpp       = fb_tag->framebuffer_bpp;
             fb.type      = fb_tag->framebuffer_type;
 
-            serial_printf("[fb] multiboot framebuffer tag found [%x]\n", 
-                (void*[]){&fb.phys_addr});
+            serial_printf("[fb] multiboot framebuffer tag found [%x]\n", fb.phys_addr);
 
             if (fb.type != MB2_FRAMEBUFFER_RGB) {
-                serial_printf("[fb] unsupported framebuffer type %x\n", 
-                    (void*[]){&fb.type});
+                serial_printf("[fb] unsupported framebuffer type %x\n", fb.type);
                 return -1;        
             }
             else if (fb.bpp != 32) {
-                serial_printf("[fb] unsupported framebuffer type %x\n", 
-                    (void*[]){&fb.bpp});
+                serial_printf("[fb] unsupported framebuffer type %x\n", fb.bpp);
                 return -1;
             }
 
@@ -136,6 +133,6 @@ const uint32_t fb_pitch() {
     return fb.pitch;
 }
 
-const uint8_t *fb_base() {
+volatile uint8_t *fb_base() {
     return fb.virt_addr;
 }

@@ -186,7 +186,7 @@ void heap_test() {
         "[heap_test] bins[6]:\n"
         "[heap_test] \tsize: %u\n"
         "[heap_test] \tfree: %d\n", 
-        (void*[]){&bins[6]->size, &free}
+        bins[6]->size, free
     );
 
     // 16 left after c kmalloc'd
@@ -197,7 +197,7 @@ void heap_test() {
         "[heap_test] bins[0]:\n"
         "[heap_test] \tsize: %u\n"
         "[heap_test] \tfree: %d\n", 
-        (void*[]){&bins[0]->size, &free}
+        bins[0]->size, free
     );
 
     // need new page after d is kmalloc'd
@@ -208,7 +208,7 @@ void heap_test() {
         "[heap_test] bins[7]:\n"
         "[heap_test] \tsize: %u\n"
         "[heap_test] \tfree: %d\n", 
-        (void*[]){&bins[7]->size, &free}
+        bins[7]->size, free
     );
 
     kfree(a);
