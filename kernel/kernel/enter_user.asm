@@ -25,7 +25,14 @@ user_test_begin:
     mov gs, ax
 
     mov rax, 1
+    lea rdi, [rel user_message] 
+    mov rsi, user_message_end - user_message 
     int 0x80
 
     ud2
+
+user_message:
+    db "hello from ring 3", 10
+user_message_end:
+
 user_test_end:

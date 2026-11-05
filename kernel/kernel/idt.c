@@ -1,11 +1,13 @@
 #include "kernel/idt.h"
 #include "drivers/serial.h"
 #include "drivers/pic.h"
+#include "kernel/syscall.h"
 #include "kernel/task.h"
 
 // 256 possible vectors, 32 cpu-defined exceptions.
 #define IDT_ENTRIES 256
 #define PIT_IRQ_VEC 0x20
+#define SYSCALL_VEC 0x80
 
 struct idt_entry idt[IDT_ENTRIES];  // the table itself
 struct idt_ptr idtp;                 // what we hand to `lidt`
@@ -164,14 +166,14 @@ static const char *exception_names[32] = {
 
 void idt_common_handler(struct interrupt_frame *frame) {
 
-    if (frame->vector == 0x20) {
+    if (frame->vector == PIT_IRQ_VEC) {
         pit_ticks++;
         pic_send_eoi(0);
         schedule();
         return;
     }
-    else if (frame->vector == 0x80) {
-        serial_print("[syscall] entered\n");
+    else if (frame->vector == SYSCALL_VEC) {
+        frame->rax = syscall_dispatch(frame);
         return;
     }
     else if (frame->vector < 32) {
@@ -192,10 +194,11 @@ void idt_common_handler(struct interrupt_frame *frame) {
 
             serial_printf("PAGE FAULT (%x)\n", fault_addr);
         } 
-        else if (from_user(frame)) {
+        if (from_user(frame)) {
             serial_print("[fault] user task killed\n");
             task_exit(); // noreturn
         }
+        for (;;) asm volatile("cli; hlt");
     } 
     else {
         serial_print("Unhandled interrupt\n");
