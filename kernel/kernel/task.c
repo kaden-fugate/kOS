@@ -2,7 +2,9 @@
 #include "cpu.h"
 #include "tss.h"
 #include "drivers/serial.h"
+#include "mm/def.h"
 #include "mm/heap.h"
+#include "mm/vmm.h"
 
 struct task boot_task;
 struct task *current;
@@ -35,25 +37,36 @@ struct task *task_create(void (*entry)(void)) {
     t->next  = NULL;
     t->state = TASK_READY;
 
+    t->pml4 = k_pml4;
+    t->pml4_phys = boot_task.pml4_phys;
+
     return t;
 }
 
 void schedule() {
     struct task *prev = current;
     struct task *next = prev->next;
-    if (!next || next == prev) return;
+
+    if (!next || next == prev) 
+        return;
 
     current = next;
+
+    if (next->pml4_phys != prev->pml4_phys)
+        write_cr3(next->pml4_phys);
+
     tss_set_rsp0(next->kstack_top);
     switch_context(&prev->rsp, next->rsp);
 }
 
 void task_init() {
-    boot_task.next     = &boot_task;
-    boot_task.state    = TASK_RUNNING;
+    boot_task.next       = &boot_task;
+    boot_task.state      = TASK_RUNNING;
     boot_task.kstack_top = (uint64_t)kernel_stack_top;
-    boot_task.stk_base = NULL;
-    boot_task.rsp      = 0;
+    boot_task.stk_base   = NULL;
+    boot_task.pml4       = k_pml4;
+    boot_task.pml4_phys  = read_cr3() & PTE_ADDR_MASK;
+    boot_task.rsp        = 0;
 
     current = &boot_task;
     serial_printf("boot kstack_top=%x\n", boot_task.kstack_top);
@@ -86,6 +99,7 @@ void task_exit() {
 
     dead->state = TASK_DEAD;
     current = next;
+    write_cr3(next->pml4_phys);
 
     tss_set_rsp0(next->kstack_top);
     switch_context(&dead->rsp, next->rsp);

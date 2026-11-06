@@ -13,8 +13,13 @@ enum task_state { TASK_READY, TASK_RUNNING, TASK_DEAD };
 
 struct task {
     uint64_t                 rsp;        // saved stack ptr
+
+    uint64_t                *pml4;       // current pml4
+    uint64_t                 pml4_phys;  // phys addr of current pml4
+
     uint8_t                 *stk_base;   // base of the stack
     uint64_t                 kstack_top; // top of this tasks kernel stack
+    
     struct task             *next;       // next task to run
     volatile enum task_state state;      // task state
 };

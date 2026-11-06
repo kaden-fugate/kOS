@@ -56,8 +56,6 @@ static void console_scroll() {
 static void inc_cursor_row() {
     cursor_row = cursor_row + glyph_height;
     cursor_col = 0;
-
-
 }
 
 static void inc_cursor_col() {

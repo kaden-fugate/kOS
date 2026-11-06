@@ -8,6 +8,7 @@
 
 #include "kernel/gdt.h"
 #include "kernel/idt.h"
+#include "kernel/syscall.h"
 #include "kernel/task.h"
 #include "kernel/tss.h"
 
@@ -46,8 +47,14 @@ void kernel_main(uint32_t info_ptr, uint32_t magic) {
     asm volatile("sti");
 
     pre_emption_test();
-    asm volatile("int $0x80");
-    serial_print("[syscall_test] retruned to ring 0\n");
+    uint64_t result = SYS_PING;
+    asm volatile(
+        "int $0x80"
+        : "+a"(result)
+        :
+        : "memory"
+    );
+    serial_print("[syscall_test] returned to ring 0\n");
 
     ktest_post_mt();
 
