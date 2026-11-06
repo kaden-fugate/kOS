@@ -6,7 +6,7 @@
 #include "font.h"
 
 void console_init(uint32_t);
-void console_write(const char*, uint64_t);
+void console_write(const char*, uint16_t);
 void console_print(const char*);
 void console_printf(const char*, ...);
 

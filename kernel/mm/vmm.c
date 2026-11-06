@@ -207,3 +207,19 @@ void vmm_test() {
     // *(uint64_t *)r_virt = 0xCAFEBABE;
     // serial_print("[vmm_test] if we reached this point, permissions enforcement failed.\n");
 }
+
+int vmm_create_user_pml4(uint64_t **pml4_out, uint64_t *pml4_phys_out) {
+    uint64_t phys = pmm_alloc(0);
+    if (!phys) return -1;
+
+    uint64_t *pml4 = PHYS_TO_VIRT(phys);
+    memset(pml4, 0, PAGE_SIZE);
+
+    for (int i = 256; i < 512; i++)
+        pml4[i] = k_pml4[i];
+
+    *pml4_out      = pml4;
+    *pml4_phys_out = phys;
+
+    return 0;
+}

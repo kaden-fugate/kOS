@@ -9,6 +9,7 @@ void     vmm_unmap(uint64_t*, uint64_t);
 uint64_t vmm_alloc(uint64_t*, uint64_t, uint8_t, uint64_t);
 uint64_t vmm_translate(uint64_t);
 void     vmm_test();
+int      vmm_create_user_pml4(uint64_t**, uint64_t*);
 
 extern uint64_t *k_pml4;
 
