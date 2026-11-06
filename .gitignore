@@ -1,3 +1,4 @@
 kernel/out
 kernel/isodir
 kernel/kos.iso
+kernel/.DS_Store

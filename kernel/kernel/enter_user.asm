@@ -17,6 +17,11 @@ section .rodata
 global user_test_begin
 global user_test_end
 
+%define USER_DATA_BASE 0x0000000050000000
+%define SYS_WRITE      1
+%define SYS_EXIT       2
+%define SYS_YIELD      3
+
 user_test_begin:
     mov ax, 0x23
     mov ds, ax
@@ -24,9 +29,22 @@ user_test_begin:
     mov fs, ax
     mov gs, ax
 
-    mov rax, 1
+    mov rbx, USER_DATA_BASE
+    mov r12, [rbx]
+
+    mov rax, 0xA5A5A5A5A5A5A5A5
+    xor r12, rax
+    mov [rbx], r12
+
+    mov rax, SYS_YIELD
+    int 0x80
+
+    mov rax, SYS_WRITE
     lea rdi, [rel user_message] 
     mov rsi, user_message_end - user_message 
+    int 0x80
+
+    mov rax, SYS_EXIT
     int 0x80
 
     ud2
